@@ -451,32 +451,53 @@
         function tick() { const e = document.getElementById('loginClock'); if (e) e.textContent = new Date().toLocaleTimeString('en-US', { hour12: false }); }
         tick(); setInterval(tick, 1000);
 
-        // Auth
+        // ── Auth Config ──
         const VALID_CODES = ['warroom', 'admin', 'iran2026'];
+
+        // Authorized Google/email users (Jeff & Dan)
+        const AUTHORIZED_EMAILS = {
+            'donnywonny2023@gmail.com': 'Jeff Kerr',
+            'egan.daniel@gmail.com': 'Dan Egan',
+        };
+
+        // Mom's dedicated login
+        const MOM_LOGIN = {
+            email: 'debbus02@yahoo.com',
+            password: 'disney3838',
+            name: 'Debbie'
+        };
+
+        function grantAccess(name, method, email) {
+            localStorage.setItem('warroom_auth', JSON.stringify({
+                name: name, email: email || '', method: method, justLoggedIn: true,
+                exp: Date.now() + 7 * 24 * 60 * 60 * 1000, loginAt: new Date().toISOString()
+            }));
+            const err = document.getElementById('loginError');
+            err.style.display = 'none';
+            const btn = document.querySelector('.login-btn');
+            btn.textContent = 'ACCESS GRANTED'; btn.style.background = 'linear-gradient(135deg,#00a040,#00e050)';
+            document.querySelector('.status-text').textContent = 'Authenticated';
+            document.querySelector('.status-text').style.color = '#00e050';
+            setTimeout(() => { window.location.href = '/'; }, 700);
+        }
+
+        // Access code login
         function handleLogin(e) {
             e.preventDefault();
             const code = document.getElementById('accessCode').value.trim().toLowerCase();
+            const userName = document.getElementById('userName').value.trim() || 'Operator';
             const err = document.getElementById('loginError');
             if (!code) { err.textContent = 'Enter an access code'; err.style.display = 'block'; return; }
             if (VALID_CODES.includes(code)) {
-                const userName = document.getElementById('userName').value.trim() || 'Operator';
-                localStorage.setItem('warroom_auth', JSON.stringify({
-                    name: userName, method: 'code', justLoggedIn: true,
-                    exp: Date.now() + 24 * 60 * 60 * 1000, loginAt: new Date().toISOString()
-                }));
-                err.style.display = 'none';
-                const btn = document.querySelector('.login-btn');
-                btn.textContent = 'ACCESS GRANTED'; btn.style.background = 'linear-gradient(135deg,#00a040,#00e050)';
-                document.querySelector('.status-text').textContent = 'Authenticated';
-                document.querySelector('.status-text').style.color = '#00e050';
-                setTimeout(() => { window.location.href = '/'; }, 700);
+                grantAccess(userName, 'code');
             } else {
                 err.textContent = 'Invalid access code. Authorization denied.'; err.style.display = 'block';
                 document.getElementById('accessCode').value = ''; document.getElementById('accessCode').focus();
             }
         }
+
+        // Google-style email login (allowlisted emails)
         function startGoogleLogin() {
-            // For testing: show email input instead of real Google OAuth
             const card = document.querySelector('.login-card');
             const existing = document.getElementById('emailLoginGroup');
             if (existing) { existing.querySelector('input').focus(); return; }
@@ -485,37 +506,57 @@
             div.style.marginTop = '12px';
             div.innerHTML = `
                 <div class="form-group">
-                    <label class="form-label">Email Address</label>
-                    <input class="form-input" type="email" id="emailInput" placeholder="you@gmail.com" autocomplete="off">
+                    <label class="form-label">Google Email</label>
+                    <input class="form-input" type="email" id="emailInput" placeholder="you@gmail.com" autocomplete="email">
                 </div>
-                <button class="login-btn" type="button" onclick="handleEmailLogin()" style="background:linear-gradient(135deg,#c02020,#ff4040);margin-top:4px;">
-                    SIGN IN WITH EMAIL
+                <button class="login-btn" type="button" onclick="handleEmailLogin()" style="background:linear-gradient(135deg,#1050c0,#2080ff);margin-top:4px;">
+                    VERIFY & SIGN IN
                 </button>
+                <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.04);padding-top:12px;">
+                    <div class="form-group">
+                        <label class="form-label" style="color:rgba(255,200,100,0.4)">Family Login (Email + Password)</label>
+                        <input class="form-input" type="email" id="momEmail" placeholder="Email address" autocomplete="email" style="margin-bottom:6px;">
+                        <input class="form-input" type="password" id="momPass" placeholder="Password" autocomplete="current-password">
+                    </div>
+                    <button class="login-btn" type="button" onclick="handleMomLogin()" style="background:linear-gradient(135deg,#8040a0,#c060e0);margin-top:4px;">
+                        FAMILY SIGN IN
+                    </button>
+                </div>
             `;
             card.appendChild(div);
             document.getElementById('emailInput').focus();
         }
+
+        // Handle authorized email login
         function handleEmailLogin() {
-            const email = document.getElementById('emailInput').value.trim();
+            const email = document.getElementById('emailInput').value.trim().toLowerCase();
             const err = document.getElementById('loginError');
             if (!email || !email.includes('@')) {
                 err.textContent = 'Enter a valid email address'; err.style.display = 'block'; return;
             }
-            // Extract name from email (before @)
-            const namePart = email.split('@')[0].replace(/[._]/g, ' ');
-            const displayName = namePart.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-            localStorage.setItem('warroom_auth', JSON.stringify({
-                email: email, name: displayName, method: 'email', justLoggedIn: true,
-                exp: Date.now() + 24 * 3600000, loginAt: new Date().toISOString()
-            }));
-            err.style.display = 'none';
-            const btn = document.querySelector('.login-btn');
-            btn.textContent = 'ACCESS GRANTED'; btn.style.background = 'linear-gradient(135deg,#00a040,#00e050)';
-            document.querySelector('.status-text').textContent = 'Authenticated';
-            document.querySelector('.status-text').style.color = '#00e050';
-            setTimeout(() => { window.location.href = '/'; }, 700);
+            if (AUTHORIZED_EMAILS[email]) {
+                grantAccess(AUTHORIZED_EMAILS[email], 'google', email);
+            } else {
+                err.textContent = 'Email not authorized. Contact Jeff for access.'; err.style.display = 'block';
+            }
         }
-        // Already logged in?
+
+        // Handle mom's password login
+        function handleMomLogin() {
+            const email = document.getElementById('momEmail').value.trim().toLowerCase();
+            const pass = document.getElementById('momPass').value;
+            const err = document.getElementById('loginError');
+            if (!email || !pass) {
+                err.textContent = 'Enter both email and password'; err.style.display = 'block'; return;
+            }
+            if (email === MOM_LOGIN.email && pass === MOM_LOGIN.password) {
+                grantAccess(MOM_LOGIN.name, 'family', email);
+            } else {
+                err.textContent = 'Invalid email or password.'; err.style.display = 'block';
+            }
+        }
+
+        // Auto-login if still valid
         try { const a = JSON.parse(localStorage.getItem('warroom_auth') || '{}'); if (a.exp && a.exp > Date.now()) window.location.href = '/'; } catch (e) { }
     </script>
 </body>
