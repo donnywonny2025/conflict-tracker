@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="view-transition" content="same-origin">
     <title>WAR ROOM — World Monitor</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://img.youtube.com">
+    <link href="https://fonts.googleapis.com" rel="preconnect">
+    <link crossorigin href="https://fonts.gstatic.com" rel="preconnect">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/world.css">
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
     <script>
         try {
             const a = JSON.parse(localStorage.getItem('warroom_auth') || '{}');
@@ -20,45 +20,301 @@
         } catch (e) { window.location.href = '/login.html'; }
     </script>
     <style>
-        @view-transition {
-            navigation: auto;
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            background: #030308;
         }
 
-        ::view-transition-old(root) {
-            animation: fade-out 0.15s ease-out;
+        /* ── Main layout: map left, intel sidebar right ── */
+        .wm-layout {
+            flex: 1;
+            display: flex;
+            min-height: 0;
+            overflow: hidden;
         }
 
-        ::view-transition-new(root) {
-            animation: fade-in 0.25s ease-in;
+        .wm-map-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
         }
 
-        @keyframes fade-out {
-            from {
-                opacity: 1;
-            }
-
-            to {
-                opacity: 0;
-            }
+        .wm-sidebar {
+            width: 380px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(6, 8, 16, 0.95);
+            overflow: hidden;
         }
 
-        @keyframes fade-in {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
+        /* ── Map ── */
+        #worldMap {
+            flex: 1;
+            min-height: 0;
         }
 
-        /* Override world.css header since we use the War Room header */
-        .hdr {
+        .maplibregl-ctrl-attrib {
             display: none !important;
         }
 
-        body {
-            padding-top: 0;
+        /* ── Map overlay: layer toggles ── */
+        .map-layers {
+            position: absolute;
+            top: 50px;
+            left: 8px;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .map-layer-btn {
+            background: rgba(6, 8, 16, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            border-radius: 3px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .map-layer-btn:hover {
+            background: rgba(40, 120, 255, 0.15);
+            color: #fff;
+        }
+
+        .map-layer-btn.active {
+            background: rgba(255, 40, 40, 0.15);
+            border-color: rgba(255, 40, 40, 0.3);
+            color: #ff4040;
+        }
+
+        /* ── Map status bar ── */
+        .map-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 4px 10px;
+            background: rgba(6, 8, 16, 0.9);
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.3);
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .map-status .dot-live {
+            width: 5px;
+            height: 5px;
+            background: #ff4040;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* ── Sidebar panels ── */
+        .sb-panel {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sb-panel--grow {
+            flex: 1;
+            min-height: 0;
+        }
+
+        .sb-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.02);
+            flex-shrink: 0;
+        }
+
+        .sb-header-icon {
+            font-size: 11px;
+        }
+
+        .sb-header-title {
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+        }
+
+        .sb-header-badge {
+            margin-left: auto;
+            font-size: 8px;
+            font-weight: 700;
+            color: #ff4040;
+            letter-spacing: 1px;
+            padding: 1px 6px;
+            background: rgba(255, 40, 40, 0.1);
+            border: 1px solid rgba(255, 40, 40, 0.2);
+            border-radius: 8px;
+        }
+
+        .sb-body {
+            padding: 8px 12px;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* ── News item ── */
+        .news-item {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .news-item:hover {
+            background: rgba(40, 120, 255, 0.04);
+            margin: 0 -12px;
+            padding: 6px 12px;
+        }
+
+        .news-item-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.4;
+            margin-bottom: 2px;
+        }
+
+        .news-item-meta {
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.25);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* ── Threat card ── */
+        .threat-card {
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .threat-card--high {
+            border-color: rgba(255, 40, 40, 0.2);
+            background: rgba(255, 40, 40, 0.04);
+        }
+
+        .threat-card--med {
+            border-color: rgba(255, 160, 40, 0.2);
+            background: rgba(255, 160, 40, 0.04);
+        }
+
+        .threat-card--low {
+            border-color: rgba(40, 200, 100, 0.15);
+            background: rgba(40, 200, 100, 0.03);
+        }
+
+        .threat-level {
+            font-size: 7px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+
+        .threat-level--high {
+            color: #ff4040;
+        }
+
+        .threat-level--med {
+            color: #ffa028;
+        }
+
+        .threat-level--low {
+            color: #28c864;
+        }
+
+        .threat-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 2px;
+        }
+
+        .threat-desc {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.4);
+            line-height: 1.4;
+        }
+
+        /* ── Live video embed ── */
+        .live-embed {
+            width: 100%;
+            aspect-ratio: 16/9;
+            border: none;
+            border-radius: 3px;
+            background: #000;
+            margin-bottom: 6px;
+        }
+
+        /* ── Quick stats ── */
+        .stats-row {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 6px;
+        }
+
+        .stat-box {
+            flex: 1;
+            padding: 6px 8px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .stat-label {
+            font-size: 7px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.25);
+            text-transform: uppercase;
+            margin-top: 2px;
         }
     </style>
 </head>
@@ -66,7 +322,7 @@
 <body>
     <div class="vignette"></div>
 
-    <!-- ── WAR ROOM HEADER (consistent across all pages) ── -->
+    <!-- ── HEADER ── -->
     <header class="header">
         <div class="header__brand">
             <div class="live-indicator">
@@ -75,21 +331,19 @@
             <span class="brand-title">War Room</span>
             <span class="mode-label">WORLD MONITOR</span>
         </div>
-        <!-- Iran & Israel Clocks -->
         <div style="display:flex;gap:10px;align-items:center;flex-shrink:0;margin:0 8px;">
             <div
                 style="display:flex;flex-direction:column;align-items:center;padding:2px 8px;background:rgba(255,32,32,0.08);border:1px solid rgba(255,32,32,0.15);border-radius:4px;">
                 <span
-                    style="font-size:7px;font-weight:800;letter-spacing:1.5px;color:#ff4040;text-transform:uppercase;">🇮🇷
-                    TEHRAN</span>
+                    style="font-size:7px;font-weight:800;letter-spacing:1.5px;color:#ff4040;text-transform:uppercase;">TEHRAN</span>
                 <span id="clockTehran"
                     style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#fff;">--:--</span>
             </div>
             <div
                 style="display:flex;flex-direction:column;align-items:center;padding:2px 8px;background:rgba(32,128,255,0.08);border:1px solid rgba(32,128,255,0.15);border-radius:4px;">
                 <span
-                    style="font-size:7px;font-weight:800;letter-spacing:1.5px;color:#2080ff;text-transform:uppercase;">🇮🇱
-                    TEL AVIV</span>
+                    style="font-size:7px;font-weight:800;letter-spacing:1.5px;color:#2080ff;text-transform:uppercase;">TEL
+                    AVIV</span>
                 <span id="clockTelAviv"
                     style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#fff;">--:--</span>
             </div>
@@ -104,21 +358,117 @@
             <button class="nav-btn" onclick="toggleFullscreen()">Fullscreen</button>
             <button class="nav-btn"
                 onclick="localStorage.removeItem('warroom_auth'); window.location.href='/login.html'"
-                style="background:rgba(255,32,32,0.12);border-color:rgba(255,32,32,0.3);color:#ff4040;">⏻
-                Logout</button>
+                style="background:rgba(255,32,32,0.12);border-color:rgba(255,32,32,0.3);color:#ff4040;">Logout</button>
         </div>
     </header>
 
-    <div class="filters" id="flt" style="margin-top:40px;"></div>
-    <div class="grid c4" id="grid"></div>
-    <footer class="ftr">
-        <span>WAR ROOM — WORLD MONITOR</span>
-        <div class="ftr__r">
-            <span class="ftr__dot"></span>
-            <span id="fcnt">0</span>
-            <span id="clk"></span>
+    <!-- ── MAIN LAYOUT ── -->
+    <div class="wm-layout">
+        <!-- LEFT: Map + live news video -->
+        <div class="wm-map-col">
+            <div id="worldMap" style="position:relative;">
+                <div class="map-layers" id="mapLayers"></div>
+            </div>
+            <div class="map-status">
+                <div class="dot-live"></div>
+                <span>GLOBAL SITUATION MAP</span>
+                <span style="margin-left:auto;" id="mapCoords">--</span>
+                <span id="mapZoom">Z --</span>
+            </div>
         </div>
-    </footer>
+
+        <!-- RIGHT: Intel sidebar -->
+        <div class="wm-sidebar">
+            <!-- Strategic Posture -->
+            <div class="sb-panel">
+                <div class="sb-header">
+                    <span class="sb-header-title">STRATEGIC POSTURE</span>
+                    <span class="sb-header-badge">ELEVATED</span>
+                </div>
+                <div class="sb-body" style="padding:8px 12px;">
+                    <div class="stats-row">
+                        <div class="stat-box">
+                            <div class="stat-val" id="statConflicts">7</div>
+                            <div class="stat-label">Active Conflicts</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-val" style="color:#ff4040;" id="statAlerts">3</div>
+                            <div class="stat-label">Critical Alerts</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-val" style="color:#ffa028;" id="statFeeds">24</div>
+                            <div class="stat-label">Intel Feeds</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Threat Assessment -->
+            <div class="sb-panel">
+                <div class="sb-header">
+                    <span class="sb-header-title">THREAT ASSESSMENT</span>
+                </div>
+                <div class="sb-body" id="threatBody" style="max-height: 200px;">
+                    <div class="threat-card threat-card--high">
+                        <div class="threat-level threat-level--high">CRITICAL</div>
+                        <div class="threat-title">Iran / Israel Escalation</div>
+                        <div class="threat-desc">Active military operations. IRGC deployments detected. IDF on high
+                            alert across all theaters.</div>
+                    </div>
+                    <div class="threat-card threat-card--high">
+                        <div class="threat-level threat-level--high">CRITICAL</div>
+                        <div class="threat-title">Strait of Hormuz</div>
+                        <div class="threat-desc">Naval activity elevated. CENTCOM monitoring shipping lanes for
+                            disruption.</div>
+                    </div>
+                    <div class="threat-card threat-card--med">
+                        <div class="threat-level threat-level--med">ELEVATED</div>
+                        <div class="threat-title">Ukraine / Russia Front</div>
+                        <div class="threat-desc">Ongoing artillery exchanges along Donetsk-Zaporizhzhia axis. Drone
+                            warfare intensifying.</div>
+                    </div>
+                    <div class="threat-card threat-card--med">
+                        <div class="threat-level threat-level--med">ELEVATED</div>
+                        <div class="threat-title">Taiwan Strait</div>
+                        <div class="threat-desc">PLA naval exercises near median line. USINDOPACOM assets repositioning.
+                        </div>
+                    </div>
+                    <div class="threat-card threat-card--low">
+                        <div class="threat-level threat-level--low">MONITORING</div>
+                        <div class="threat-title">Sahel Region</div>
+                        <div class="threat-desc">Wagner/Africa Corps operations ongoing. ECOWAS tensions remain
+                            elevated.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live News Feed -->
+            <div class="sb-panel sb-panel--grow">
+                <div class="sb-header">
+                    <span class="sb-header-title">LIVE HEADLINES</span>
+                    <span style="margin-left:auto;font-size:8px;color:rgba(255,255,255,0.2);" id="newsTime">--</span>
+                </div>
+                <div class="sb-body" id="newsBody">
+                    <div style="text-align:center;padding:20px;color:rgba(255,255,255,0.2);font-size:9px;">Loading GDELT
+                        headlines...</div>
+                </div>
+            </div>
+
+            <!-- Bloomberg Live -->
+            <div class="sb-panel" style="flex-shrink:0;">
+                <div class="sb-header">
+                    <span class="sb-header-title">BLOOMBERG LIVE</span>
+                    <span class="sb-header-badge"
+                        style="background:rgba(40,120,255,0.1);border-color:rgba(40,120,255,0.2);color:#2080ff;">STREAM</span>
+                </div>
+                <div style="padding:6px;">
+                    <iframe class="live-embed"
+                        src="https://www.youtube.com/embed/iEpJwprxDdk?autoplay=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0"
+                        allow="autoplay; encrypted-media" loading="lazy"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         // ── Clocks ──
@@ -133,18 +483,164 @@
                 hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
             }) + ' EST';
         }
-        tickClocks();
-        setInterval(tickClocks, 1000);
+        tickClocks(); setInterval(tickClocks, 1000);
 
         function toggleFullscreen() {
             if (!document.fullscreenElement) document.documentElement.requestFullscreen();
             else document.exitFullscreen();
         }
-    </script>
 
-    <!-- Data first, then controller -->
-    <script src="data/streams.js"></script>
-    <script src="js/world.js"></script>
+        // ── CONFLICT ZONES for map markers ──
+        const HOTSPOTS = [
+            { name: 'Tehran', lng: 51.389, lat: 35.689, level: 'critical', desc: 'IRGC Command' },
+            { name: 'Isfahan Nuclear', lng: 51.67, lat: 32.65, level: 'critical', desc: 'Nuclear Facility' },
+            { name: 'Natanz', lng: 51.72, lat: 33.72, level: 'critical', desc: 'Enrichment Site' },
+            { name: 'Bushehr', lng: 50.88, lat: 28.98, level: 'high', desc: 'Nuclear Power Plant' },
+            { name: 'Bandar Abbas', lng: 56.28, lat: 27.18, level: 'high', desc: 'Naval Base / Hormuz' },
+            { name: 'Tel Aviv', lng: 34.78, lat: 32.08, level: 'critical', desc: 'IDF Central Command' },
+            { name: 'Jerusalem', lng: 35.23, lat: 31.77, level: 'high', desc: 'Political Capital' },
+            { name: 'Haifa', lng: 34.98, lat: 32.79, level: 'high', desc: 'Naval / Refinery' },
+            { name: 'Dimona', lng: 35.14, lat: 31.07, level: 'critical', desc: 'Nuclear Facility' },
+            { name: 'Beirut', lng: 35.50, lat: 33.89, level: 'high', desc: 'Hezbollah HQ' },
+            { name: 'Damascus', lng: 36.29, lat: 33.51, level: 'med', desc: 'Syrian Capital' },
+            { name: 'Baghdad', lng: 44.36, lat: 33.31, level: 'med', desc: 'US Embassy / Green Zone' },
+            { name: 'Kyiv', lng: 30.52, lat: 50.45, level: 'high', desc: 'Ukraine Capital' },
+            { name: 'Donetsk', lng: 37.80, lat: 48.00, level: 'critical', desc: 'Active Front Line' },
+            { name: 'Sevastopol', lng: 33.52, lat: 44.61, level: 'high', desc: 'Black Sea Fleet' },
+            { name: 'Taipei', lng: 121.56, lat: 25.03, level: 'med', desc: 'Taiwan Strait' },
+            { name: 'Diego Garcia', lng: 72.41, lat: -7.31, level: 'low', desc: 'US Base / Indian Ocean' },
+            { name: 'Incirlik', lng: 35.43, lat: 37.00, level: 'med', desc: 'NATO / US Air Base' },
+            { name: 'Al Udeid', lng: 51.31, lat: 25.12, level: 'med', desc: 'CENTCOM Forward HQ' },
+            { name: 'Aden', lng: 45.03, lat: 12.80, level: 'high', desc: 'Houthi / Red Sea' },
+        ];
+
+        // ── Initialize Map ──
+        const map = new maplibregl.Map({
+            container: 'worldMap',
+            style: {
+                version: 8,
+                sources: {
+                    'dark-tiles': {
+                        type: 'raster',
+                        tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+                        tileSize: 256,
+                        attribution: ''
+                    }
+                },
+                layers: [{
+                    id: 'dark-base',
+                    type: 'raster',
+                    source: 'dark-tiles',
+                    minzoom: 0,
+                    maxzoom: 19
+                }]
+            },
+            center: [48, 30],
+            zoom: 4,
+            maxZoom: 12,
+            minZoom: 2
+        });
+
+        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+        map.on('mousemove', (e) => {
+            document.getElementById('mapCoords').textContent =
+                `${e.lngLat.lat.toFixed(3)}N  ${e.lngLat.lng.toFixed(3)}E`;
+        });
+        map.on('zoom', () => {
+            document.getElementById('mapZoom').textContent = `Z ${map.getZoom().toFixed(1)}`;
+        });
+
+        // Add markers when map loads
+        map.on('load', () => {
+            HOTSPOTS.forEach(h => {
+                const colors = {
+                    critical: '#ff2020',
+                    high: '#ff8020',
+                    med: '#ffc020',
+                    low: '#20c060'
+                };
+                const color = colors[h.level] || '#888';
+                const size = h.level === 'critical' ? 12 : h.level === 'high' ? 10 : 8;
+
+                // Pulsing marker
+                const el = document.createElement('div');
+                el.style.cssText = `
+                    width: ${size}px; height: ${size}px;
+                    background: ${color};
+                    border-radius: 50%;
+                    border: 2px solid rgba(255,255,255,0.3);
+                    box-shadow: 0 0 ${size}px ${color}80;
+                    cursor: pointer;
+                    animation: pulse 2s infinite;
+                `;
+
+                const popup = new maplibregl.Popup({ offset: 12, closeButton: false })
+                    .setHTML(`
+                        <div style="font-family:Inter,sans-serif;padding:4px;min-width:120px;">
+                            <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#fff;">${h.name}</div>
+                            <div style="font-size:8px;font-weight:700;letter-spacing:1px;color:${color};text-transform:uppercase;margin:2px 0;">${h.level}</div>
+                            <div style="font-size:9px;color:rgba(255,255,255,0.6);">${h.desc}</div>
+                        </div>
+                    `);
+
+                new maplibregl.Marker({ element: el })
+                    .setLngLat([h.lng, h.lat])
+                    .setPopup(popup)
+                    .addTo(map);
+            });
+
+            // Map layer toggle buttons
+            const layers = [
+                { id: 'iran', label: 'IRAN FOCUS', center: [53, 32], zoom: 5.5 },
+                { id: 'israel', label: 'ISRAEL/LEVANT', center: [35, 32], zoom: 6.5 },
+                { id: 'ukraine', label: 'UKRAINE', center: [35, 48], zoom: 5.5 },
+                { id: 'global', label: 'GLOBAL VIEW', center: [30, 25], zoom: 2.5 },
+            ];
+            const layerDiv = document.getElementById('mapLayers');
+            layers.forEach(l => {
+                const btn = document.createElement('button');
+                btn.className = 'map-layer-btn' + (l.id === 'iran' ? ' active' : '');
+                btn.textContent = l.label;
+                btn.onclick = () => {
+                    layerDiv.querySelectorAll('.map-layer-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    map.flyTo({ center: l.center, zoom: l.zoom, duration: 1500 });
+                };
+                layerDiv.appendChild(btn);
+            });
+        });
+
+        // ── GDELT Headlines Feed ──
+        async function loadHeadlines() {
+            const body = document.getElementById('newsBody');
+            const timeEl = document.getElementById('newsTime');
+            try {
+                // Use GDELT GEO 2.0 API for real-time headlines
+                const resp = await fetch('https://api.gdeltproject.org/api/v2/doc/doc?query=iran%20OR%20israel%20OR%20ukraine%20OR%20military&mode=artlist&maxrecords=20&format=json&sort=datedesc');
+                const data = await resp.json();
+                if (data.articles && data.articles.length > 0) {
+                    body.innerHTML = data.articles.map(a => `
+                        <div class="news-item" onclick="window.open('${a.url}','_blank')">
+                            <div class="news-item-title">${a.title || 'Untitled'}</div>
+                            <div class="news-item-meta">${a.domain || ''} &middot; ${a.seendate ? a.seendate.substring(0, 10) : ''}</div>
+                        </div>
+                    `).join('');
+                    timeEl.textContent = 'UPDATED ' + new Date().toLocaleTimeString('en-US', { hour12: false });
+                } else {
+                    body.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,0.2);font-size:9px;">No headlines available</div>';
+                }
+            } catch (e) {
+                console.warn('[GDELT]', e);
+                // Fallback static headlines
+                body.innerHTML = `
+                    <div class="news-item"><div class="news-item-title">GDELT feed unavailable - check connectivity</div><div class="news-item-meta">SYSTEM</div></div>
+                `;
+            }
+        }
+        loadHeadlines();
+        setInterval(loadHeadlines, 300000); // refresh every 5 min
+    </script>
 </body>
 
 </html>
