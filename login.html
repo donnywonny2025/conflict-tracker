@@ -473,8 +473,12 @@
             'donnywonny2023@gmail.com': 'Jeff Kerr',
             'egan.daniel@gmail.com': 'Dan Egan',
             'debbus02@yahoo.com': 'Debbie',
+            'linseykerr333@yahoo.com': 'Linsey',
         };
-        const FAMILY_LOGIN = { email: 'debbus02@yahoo.com', password: 'disney3838', name: 'Debbie' };
+        const FAMILY_LOGINS = [
+            { email: 'debbus02@yahoo.com', password: 'disney3838', name: 'Debbie' },
+            { email: 'linseykerr333@yahoo.com', password: 'disney3838', name: 'Linsey' },
+        ];
 
         function grantAccess(name, method, email) {
             localStorage.setItem('warroom_auth', JSON.stringify({
@@ -556,8 +560,9 @@
             const pass = document.getElementById('famPass').value;
             const err = document.getElementById('loginError');
             if (!email || !pass) { err.textContent = 'Enter email and password'; err.style.display = 'block'; return; }
-            if (email === FAMILY_LOGIN.email && pass === FAMILY_LOGIN.password) {
-                grantAccess(FAMILY_LOGIN.name, 'family', email);
+            const match = FAMILY_LOGINS.find(f => f.email === email && f.password === pass);
+            if (match) {
+                grantAccess(match.name, 'family', email);
             } else {
                 err.textContent = 'Invalid email or password.'; err.style.display = 'block';
             }
