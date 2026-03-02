@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="view-transition" content="same-origin">
+    <title>WAR ROOM — Intelligence Command Center</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect">
+    <link crossorigin href="https://fonts.gstatic.com" rel="preconnect">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        @view-transition {
+            navigation: auto;
+        }
+
+        ::view-transition-old(root) {
+            animation: fade-out 0.2s ease-out;
+        }
+
+        ::view-transition-new(root) {
+            animation: fade-in 0.3s ease-in;
+        }
+
+        @keyframes fade-out {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+    <script>
+        // Auth guard — redirect to login if not authenticated
+        try {
+            const auth = JSON.parse(localStorage.getItem('warroom_auth') || '{}');
+            if (!auth.exp || auth.exp < Date.now()) {
+                localStorage.removeItem('warroom_auth');
+                window.location.href = '/login.html';
+            }
+        } catch (e) { window.location.href = '/login.html'; }
+    </script>
+</head>
+
+<body>
+    <div class="vignette"></div>
+
+    <!-- ── WELCOME OVERLAY (shows on first login) ── -->
+    <div id="welcomeOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(3,3,8,0.95);
+        display:none;flex-direction:column;align-items:center;justify-content:center;
+        font-family:'Inter',sans-serif;cursor:pointer;transition:opacity 0.8s ease;" onclick="dismissWelcome()">
+        <div style="text-align:center;animation:welcomeIn 1s cubic-bezier(0.16,1,0.3,1) forwards;">
+            <div
+                style="font-size:9px;font-weight:800;letter-spacing:4px;color:rgba(40,120,255,0.5);text-transform:uppercase;margin-bottom:12px;">
+                WAR ROOM — INTELLIGENCE COMMAND CENTER
+            </div>
+            <div style="font-size:36px;font-weight:900;letter-spacing:6px;color:#fff;text-transform:uppercase;"
+                id="welcomeName">
+                WELCOME
+            </div>
+            <div
+                style="width:120px;height:2px;background:linear-gradient(90deg,transparent,rgba(40,120,255,0.6),transparent);margin:20px auto;">
+            </div>
+            <div
+                style="font-size:10px;font-weight:600;letter-spacing:3px;color:rgba(255,255,255,0.25);text-transform:uppercase;">
+                CLICK TO ENTER · ALL SYSTEMS ONLINE
+            </div>
+        </div>
+    </div>
+    <style>
+        @keyframes welcomeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+    </style>
+    <script>
+        (function () {
+            try {
+                const auth = JSON.parse(localStorage.getItem('warroom_auth') || '{}');
+                if (auth.justLoggedIn) {
+                    const overlay = document.getElementById('welcomeOverlay');
+                    const nameEl = document.getElementById('welcomeName');
+                    nameEl.textContent = 'WELCOME, ' + (auth.name || 'OPERATOR').toUpperCase();
+                    overlay.style.display = 'flex';
+                    // Auto-dismiss after 4 seconds
+                    setTimeout(() => { if (overlay.style.display === 'flex') dismissWelcome(); }, 4000);
+                    // Clear the flag so it doesn't show again on page nav
+                    auth.justLoggedIn = false;
+                    localStorage.setItem('warroom_auth', JSON.stringify(auth));
+                }
+            } catch (e) { }
+        })();
+        function dismissWelcome() {
+            const o = document.getElementById('welcomeOverlay');
+            if (o) { o.style.opacity = '0'; setTimeout(() => o.style.display = 'none', 800); }
+        }
+    </script> <!-- ── HEADER ── -->
+    <header class="header">
+        <div class="header__brand">
+            <div class="live-indicator">
+                <div class="live-dot"></div>LIVE
+            </div>
+            <span class="brand-title">War Room</span>
+            <span class="mode-label" id="modeLabel">IRAN/ISRAEL</span>
+        </div>
+        <!-- Iran & Israel Clocks -->
+        <div style="display:flex;gap:10px;align-items:center;flex-shrink:0;margin:0 8px;">
+            <div
+                style="display:flex;flex-direction:column;align-items:center;padding:2px 8px;background:rgba(255,32,32,0.08);border:1px solid rgba(255,32,32,0.15);border-radius:4px;">
+                <span
+                    style="font-size:7px;font-weight:800;letter-spacing:1.5px;color:#ff4040;text-transform:uppercase;">🇮🇷
+                    TEHRAN</span>
+                <span id="clockTehran"
+                    style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#fff;">--:--</span>
+                <span id="wxTehran" style="font-size:7px;color:#888;">--</span>
+            </div>
+            <div
+                style="display:flex;flex-direction:column;align-items:center;padding:2px 8px;background:rgba(32,128,255,0.08);border:1px solid rgba(32,128,255,0.15);border-radius:4px;">
+                <span
+                    style="font-size:7px;font-weight:800;letter-spacing:1.5px;color:#2080ff;text-transform:uppercase;">🇮🇱
+                    TEL AVIV</span>
+                <span id="clockTelAviv"
+                    style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#fff;">--:--</span>
+                <span id="wxTelAviv" style="font-size:7px;color:#888;">--</span>
+            </div>
+        </div>
+        <div class="header__ticker">
+            <span class="ticker" id="ticker"></span>
+        </div>
+        <div class="header__controls">
+            <span class="clock" id="clock"></span>
+            <button class="nav-btn" id="soloExitBtn" style="display:none" onclick="feeds.exitSolo()">✕ Exit
+                Solo</button>
+            <button class="nav-btn" onclick="feeds.openEditor()">Configure</button>
+            <button class="nav-btn" onclick="app.toggleFullscreen()">Fullscreen</button>
+            <span class="nav-hint">1-9 audio · S solo · ESC mute</span>
+            <button class="nav-btn"
+                onclick="localStorage.removeItem('warroom_auth'); window.location.href='/login.html'"
+                style="background:rgba(255,32,32,0.12);border-color:rgba(255,32,32,0.3);color:#ff4040;">⏻
+                Logout</button>
+        </div>
+    </header>
+
+    <!-- ── MAIN LAYOUT ── -->
+    <main class="dashboard">
+        <!-- LEFT: Video Wall -->
+        <section class="dashboard__main" id="dashboardMain">
+            <div class="live-tabs" id="liveTabs">
+                <button class="live-tab active" onclick="switchLiveTab('iran-attacks')">IRAN ATTACKS</button>
+                <a href="/groundviews.html" class="live-tab"
+                    style="margin-left:auto;background:rgba(255,32,32,0.08);border:1px solid rgba(255,32,32,0.2);color:#ff4040;text-decoration:none;">⛶
+                    GROUND VIEWS</a>
+                <a href="/page3.html" class="live-tab"
+                    style="background:rgba(255,32,32,0.08);border:1px solid rgba(255,32,32,0.2);color:#ff4040;text-decoration:none;">⛶
+                    WORLD MONITOR</a>
+            </div>
+            <div class="dashboard__feeds" id="videoWall"></div>
+        </section>
+
+        <!-- RIGHT: Intelligence Sidebar -->
+        <aside class="dashboard__intel">
+            <!-- X / Live Feed — Scrollable Cards + Inline Video -->
+            <div class="intel-panel" id="xPanel"
+                style="flex-shrink:1;flex-grow:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
+                <div class="intel-panel__header">
+                    <span class="intel-panel__icon">&Xscr;</span>
+                    <span class="intel-panel__title">LIVE FEED</span>
+                    <span id="xVideoCount"
+                        style="font-size:9px;color:var(--text-muted);margin-left:auto;">&mdash;</span>
+                    <span id="xCountdown"
+                        style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#ff4040;margin-left:6px;min-width:28px;text-align:right;">60s</span>
+                </div>
+                <div style="height:2px;background:rgba(255,255,255,0.05);flex-shrink:0;overflow:hidden;">
+                    <div id="xProgressBar"
+                        style="height:100%;width:0%;background:linear-gradient(90deg,#ff4040,#ff8020);transition:width 1s linear;">
+                    </div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+                    <div id="xTweetList" style="flex:1;overflow-y:auto;padding:4px;background:#080810;"></div>
+                    <div
+                        style="display:flex;gap:2px;padding:3px 5px;background:var(--bg-card);border-top:1px solid var(--border);flex-shrink:0;">
+                        <button class="cell-btn" style="flex:1;font-size:8px;"
+                            onclick="switchXFeed('iran war video')">&#x1F1EE;&#x1F1F7; Latest</button>
+                        <button class="cell-btn" style="flex:1;font-size:8px;"
+                            onclick="switchXFeed('iran OSINT strikes')">&#x1F50D; OSINT</button>
+                        <button class="cell-btn" style="flex:1;font-size:8px;"
+                            onclick="switchXFeed('CENTCOM iran military')">&#x1F6E1;&#xFE0F; MIL</button>
+                        <button class="cell-btn" style="flex:1;font-size:8px;" onclick="showSavedTweets()">❤️
+                            Saved</button>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <!-- Quick Launch Bar -->
+            <div class="quick-bar">
+                <button class="qbar-btn" onclick="toggleWorldDrawer()">🌍 World</button>
+                <button class="qbar-btn" onclick="toggleOsintPopout()">🛰️ OSINT</button>
+                <button class="qbar-btn"
+                    onclick="var p=document.getElementById('newsPanel');p.style.display=p.style.display==='none'?'':'none'">📰
+                    News</button>
+                <button class="qbar-btn"
+                    onclick="var p=document.getElementById('polymarketPanel');p.style.display=p.style.display==='none'?'':'none'">📊
+                    Poly</button>
+            </div>
+
+            <!-- Breaking News Feeds (hidden by default — toggle via 📰 button) -->
+            <div class="intel-panel intel-panel--grow" id="newsPanel" style="display:none;">
+                <div class="intel-panel__header">
+                    <span class="intel-panel__icon">📰</span>
+                    <span class="intel-panel__title">Breaking News</span>
+                    <span class="intel-panel__link" style="cursor:default;font-size:7px;" id="newsTime"></span>
+                </div>
+                <div class="intel-panel__body intel-panel__body--scroll" id="newsBody">
+                    <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:9px;">Loading feeds...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Polymarket Widget (hidden by default — toggle via 📊 button) -->
+            <div class="intel-panel" id="polymarketPanel" style="display:none;">
+                <div class="intel-panel__header">
+                    <span class="intel-panel__icon">📊</span>
+                    <span class="intel-panel__title">Polymarket Odds</span>
+                    <a href="https://polymarket.com/predictions/iran" target="_blank" class="intel-panel__link">View All
+                        ↗</a>
+                </div>
+                <div class="intel-panel__body intel-panel__body--scroll" id="polymarketBody"></div>
+            </div>
+
+            <!-- OSINT Floating Popout -->
+            <div class="osint-popout" id="osintPopout">
+                <div class="osint-popout__header">
+                    <span>🛰️ OSINT Dashboards</span>
+                    <button class="osint-popout__close" onclick="toggleOsintPopout()">✕</button>
+                </div>
+                <div class="osint-popout__body" id="osintBody"></div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- ── FOOTER ── -->
+    <footer class="footer">
+        <div class="footer__left">WAR ROOM — INTELLIGENCE COMMAND CENTER — IRAN · ISRAEL · MIDDLE EAST</div>
+        <div class="footer__right">
+            <span><span class="dot-green"></span><span id="feedCount">0</span> FEEDS</span>
+            <span id="dateDisplay"></span>
+        </div>
+    </footer>
+
+    <!-- ── CONFIGURE MODAL ── -->
+    <div class="modal" id="editModal">
+        <div class="modal__content">
+            <h2>Configure Streams</h2>
+            <p class="modal__hint">YouTube / Twitch / Kick / Rumble — Paste URLs or video IDs. Add a region tag for the
+                badge.</p>
+            <div id="streamInputs"></div>
+            <div class="modal__actions">
+                <div class="modal__actions-left">
+                    <button class="btn btn--add" onclick="feeds.addStream()">+ Add Stream</button>
+                    <button class="btn btn--preset" onclick="feeds.loadPreset('iran')">🔥 Iran/Israel</button>
+                    <button class="btn btn--preset" onclick="feeds.loadPreset('world')">🌍 World News</button>
+                    <button class="btn btn--preset" onclick="feeds.loadPreset('osint')">🛰️ OSINT</button>
+                    <button class="btn btn--preset" onclick="feeds.loadPreset('all')">📡 All Feeds</button>
+                    <button class="btn btn--preset" onclick="feeds.loadFavorites()" style="border-color:#e25555">❤️
+                        Favorites</button>
+                </div>
+                <div class="modal__actions-right">
+                    <button class="btn btn--cancel" onclick="feeds.closeEditor()">Cancel</button>
+                    <button class="btn btn--save" onclick="feeds.saveStreams()">Save & Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── WORLD MONITOR DRAWER ── -->
+    <div class="drawer-overlay" id="drawerOverlay" onclick="toggleWorldDrawer()"></div>
+    <div class="drawer" id="worldDrawer">
+        <div class="drawer__header">
+            <span class="hdr__live"
+                style="background:var(--accent-red);color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:8px;letter-spacing:1px;">LIVE</span>
+            <span style="font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">🌍 WORLD
+                MONITOR</span>
+            <span id="drawerCnt" style="font-size:9px;color:var(--text-muted);margin-left:auto;">0</span>
+            <select id="drawerGs" onchange="setDrawerGrid(this.value)"
+                style="background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:3px;padding:2px 7px;font-size:9px;">
+                <option value="3">3 col</option>
+                <option value="4" selected>4 col</option>
+                <option value="5">5 col</option>
+                <option value="6">6 col</option>
+            </select>
+            <button class="nav-btn" onclick="playAllDrawer()">▶ Play All</button>
+            <button class="nav-btn" onclick="toggleWorldDrawer()">✕ Close</button>
+        </div>
+        <div class="drawer__filters" id="drawerFlt"></div>
+        <div class="drawer__grid c4" id="drawerGrid"></div>
+    </div>
+
+    <!-- ── SCRIPTS ── -->
+    <!-- YouTube API loaded after feeds.js below -->
+    <script>
+        let _xRefreshTimer = null;
+        let _currentQuery = 'iran war video';
+        let _showingSaved = false;
+        let _lastTweets = [];
+        let _xRefreshCountdown = 60;
+        let _xCountdownTimer = null;
+        let _xOffset = 0;
+        let _xLoadingMore = false;
+        let _xAllLoaded = false;
+        let _xScrollObserver = null;
+
+        function timeAgo(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            const now = new Date();
+            const diff = Math.floor((now - d) / 1000);
+            if (diff < 0) return 'just now';
+            if (diff < 60) return diff + 's ago';
+            if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            return Math.floor(diff / 86400) + 'd ago';
+        }
+
+        // Saved tweets — localStorage
+        function getSavedTweets() {
+            try { return JSON.parse(localStorage.getItem('warroom_saved') || '{}'); } catch { return {}; }
+        }
+        function saveTweet(tweetData) {
+            const saved = getSavedTweets();
+            saved[tweetData.id] = { ...tweetData, saved_at: new Date().toISOString() };
+            localStorage.setItem('warroom_saved', JSON.stringify(saved));
+        }
+        function unsaveTweet(id) {
+            const saved = getSavedTweets();
+            delete saved[id];
+            localStorage.setItem('warroom_saved', JSON.stringify(saved));
+        }
+        function isSaved(id) { return !!getSavedTweets()[id]; }
+
+        function toggleSave(id, e) {
+            e.stopPropagation();
+            if (isSaved(id)) {
+                unsaveTweet(id);
+            } else {
+                const tweet = _lastTweets.find(t => t.id === id);
+                if (tweet) saveTweet(tweet);
+            }
+            // Re-render
+            if (_showingSaved) showSavedTweets();
+            else renderTweetCards(_lastTweets);
+        }
+
+        function renderTweetCards(tweets, append) {
+            if (!append) _lastTweets = tweets;
+            else _lastTweets = _lastTweets.concat(tweets);
+            const list = document.getElementById('xTweetList');
+            const counter = document.getElementById('xVideoCount');
+            if (!list) return;
+            const savedCount = Object.keys(getSavedTweets()).length;
+            if (counter) counter.textContent = (_showingSaved ? savedCount + ' saved' : _lastTweets.length + ' posts');
+
+            const html = tweets.map(t => {
+                const ago = timeAgo(t.created || t.saved_at);
+                const saved = isSaved(t.id);
+                const heartBtn = '<span onclick="toggleSave(\'' + t.id + '\', event)" style="cursor:pointer;font-size:14px;margin-left:6px;transition:all 0.2s;" title="' + (saved ? 'Unsave' : 'Save') + '">' + (saved ? '❤️' : '🤍') + '</span>';
+                const videoHtml = t.video_url
+                    ? '<video src="/api/xvideo?url=' + encodeURIComponent(t.video_url) + '" autoplay loop muted playsinline preload="auto" style="width:100%;max-height:200px;border-radius:4px;margin-top:4px;background:#000;"></video>'
+                    : (t.thumbnail
+                        ? '<img src="' + t.thumbnail + '" style="width:100%;max-height:160px;object-fit:cover;border-radius:4px;margin-top:4px;" loading="lazy">'
+                        : '');
+                return '<div style="padding:8px;margin-bottom:4px;background:' + (saved ? 'rgba(255,50,50,0.06)' : 'rgba(255,255,255,0.04)') + ';border:1px solid ' + (saved ? 'rgba(255,50,50,0.15)' : 'rgba(255,255,255,0.08)') + ';border-radius:6px;cursor:pointer;" onclick="window.open(\'https://x.com/i/status/' + t.id + '\',\'_blank\')">'
+                    + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+                    + '<span style="font-size:11px;color:#1d9bf0;font-weight:600;">@' + (t.author || '?') + '</span>'
+                    + (t.has_video ? '<span style="font-size:8px;color:#e84855;font-weight:700;">&#9654; VID</span>' : '')
+                    + '<span style="font-size:9px;color:#888;margin-left:auto;">' + ago + '</span>'
+                    + heartBtn
+                    + '</div>'
+                    + '<div style="font-size:12px;color:#ddd;line-height:1.4;">' + (t.text || '') + '</div>'
+                    + videoHtml
+                    + '<div style="display:flex;gap:10px;margin-top:4px;font-size:9px;color:#666;">'
+                    + '<span>&#9829; ' + (t.likes || 0) + '</span>'
+                    + '<span>&#8635; ' + (t.retweets || 0) + '</span>'
+                    + '</div>'
+                    + '</div>';
+            }).join('');
+
+            if (append) {
+                // Remove sentinel before appending
+                const oldSentinel = list.querySelector('#xLoadMore');
+                if (oldSentinel) oldSentinel.remove();
+                list.insertAdjacentHTML('beforeend', html);
+            } else {
+                list.innerHTML = html;
+            }
+
+            // Add "load more" sentinel at bottom
+            if (!_xAllLoaded && !_showingSaved) {
+                const existing = list.querySelector('#xLoadMore');
+                if (existing) existing.remove();
+                const sentinel = document.createElement('div');
+                sentinel.id = 'xLoadMore';
+                sentinel.style.cssText = 'text-align:center;padding:12px;color:#555;font-size:10px;';
+                sentinel.textContent = 'Loading more...';
+                list.appendChild(sentinel);
+                // Observe sentinel for infinite scroll
+                if (_xScrollObserver) _xScrollObserver.disconnect();
+                _xScrollObserver = new IntersectionObserver((entries) => {
+                    if (entries[0].isIntersecting && !_xLoadingMore && !_xAllLoaded) {
+                        loadMoreTweets();
+                    }
+                }, { root: list, threshold: 0.1 });
+                _xScrollObserver.observe(sentinel);
+            }
+
+            // Auto-play/pause videos when they scroll in/out of view
+            const vidObserver = new IntersectionObserver((entries) => {
+                entries.forEach(e => {
+                    if (e.isIntersecting) e.target.play().catch(() => { });
+                    else e.target.pause();
+                });
+            }, { threshold: 0.3 });
+            list.querySelectorAll('video:not([data-observed])').forEach(v => {
+                v.setAttribute('data-observed', '1');
+                vidObserver.observe(v);
+            });
+        }
+
+        function showSavedTweets() {
+            _showingSaved = true;
+            const saved = getSavedTweets();
+            const tweets = Object.values(saved).sort((a, b) => (b.saved_at || '').localeCompare(a.saved_at || ''));
+            if (tweets.length === 0) {
+                const list = document.getElementById('xTweetList');
+                if (list) list.innerHTML = '<div style="text-align:center;padding:30px;color:#666;font-size:11px;">No saved posts yet.<br>Click 🤍 on any post to save it.</div>';
+                const counter = document.getElementById('xVideoCount');
+                if (counter) counter.textContent = '0 saved';
+            } else {
+                renderTweetCards(tweets);
+            }
+        }
+
+        async function loadMoreTweets() {
+            if (_xLoadingMore || _xAllLoaded || _showingSaved) return;
+            _xLoadingMore = true;
+            _xOffset += 15;
+            try {
+                const resp = await fetch('/api/xfeed?q=' + encodeURIComponent(_currentQuery) + '&count=15&offset=' + _xOffset);
+                const data = await resp.json();
+                if (data.tweets && data.tweets.length > 0) {
+                    renderTweetCards(data.tweets, true);
+                } else {
+                    _xAllLoaded = true;
+                    const sentinel = document.getElementById('xLoadMore');
+                    if (sentinel) sentinel.textContent = '— end of feed —';
+                }
+            } catch (e) { console.warn('[LoadMore]', e); }
+            _xLoadingMore = false;
+        }
+
+        async function switchXFeed(query) {
+            _showingSaved = false;
+            _currentQuery = query || 'iran war video';
+            _xOffset = 0;
+            _xAllLoaded = false;
+            _xLoadingMore = false;
+            const list = document.getElementById('xTweetList');
+            if (list) list.innerHTML = '<div style="text-align:center;padding:30px;color:#666;font-size:11px;">Loading X feed...</div>';
+            try {
+                const resp = await fetch('/api/xfeed?q=' + encodeURIComponent(_currentQuery) + '&count=15&offset=0');
+                const data = await resp.json();
+                if (data.tweets && data.tweets.length > 0) {
+                    // Video-only, newest first
+                    const videoOnly = data.tweets.filter(t => t.has_video || t.video_url);
+                    videoOnly.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
+                    // Cap per author to max 3 so feed is diverse
+                    const authorCounts = {};
+                    const diverse = videoOnly.filter(t => {
+                        const a = t.author || '?';
+                        authorCounts[a] = (authorCounts[a] || 0) + 1;
+                        return authorCounts[a] <= 3;
+                    });
+                    renderTweetCards(diverse, false);
+                } else {
+                    if (list) list.innerHTML = '<div style="text-align:center;padding:30px;color:#666;font-size:11px;">No posts found</div>';
+                }
+            } catch (e) {
+                if (list) list.innerHTML = '<div style="text-align:center;padding:30px;color:#666;font-size:11px;">Feed error</div>';
+                setTimeout(() => switchXFeed(_currentQuery), 5000);
+            }
+            clearInterval(_xRefreshTimer);
+            _xRefreshCountdown = 60;
+            clearInterval(_xCountdownTimer);
+            _xCountdownTimer = setInterval(() => {
+                _xRefreshCountdown--;
+                const el = document.getElementById('xCountdown');
+                const bar = document.getElementById('xProgressBar');
+                if (el) el.textContent = _xRefreshCountdown + 's';
+                if (bar) bar.style.width = ((60 - _xRefreshCountdown) / 60 * 100) + '%';
+                if (_xRefreshCountdown <= 0) switchXFeed(_currentQuery);
+            }, 1000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => setTimeout(() => switchXFeed('iran war video'), 1500));
+
+        // ── Iran & Israel Clocks + Weather ──
+        function updateZoneClocks() {
+            const fmt = (tz) => new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            const te = document.getElementById('clockTehran');
+            const ta = document.getElementById('clockTelAviv');
+            if (te) te.textContent = fmt('Asia/Tehran');
+            if (ta) ta.textContent = fmt('Asia/Jerusalem');
+        }
+        updateZoneClocks();
+        setInterval(updateZoneClocks, 1000);
+
+        // Weather via Open-Meteo (free, no API key)
+        const WMO_ICONS = { 0: '☀️', 1: '🌤', 2: '⛅', 3: '☁️', 45: '🌫', 48: '🌫', 51: '🌦', 53: '🌧', 55: '🌧', 61: '🌧', 63: '🌧', 65: '🌧️', 71: '🌨', 73: '🌨', 75: '🌨', 80: '🌦', 81: '🌧', 82: '⛈', 95: '⛈', 96: '⛈', 99: '⛈' };
+        async function fetchWeather() {
+            try {
+                // Tehran: 35.6892, 51.3890 | Tel Aviv: 32.0853, 34.7818
+                const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=35.69,32.09&longitude=51.39,34.78&current=temperature_2m,weathercode&timezone=auto');
+                const d = await r.json();
+                if (Array.isArray(d)) {
+                    const [tehran, tlv] = d;
+                    const wTe = document.getElementById('wxTehran');
+                    const wTa = document.getElementById('wxTelAviv');
+                    if (wTe && tehran.current) wTe.textContent = (WMO_ICONS[tehran.current.weathercode] || '') + ' ' + Math.round(tehran.current.temperature_2m) + '°C';
+                    if (wTa && tlv.current) wTa.textContent = (WMO_ICONS[tlv.current.weathercode] || '') + ' ' + Math.round(tlv.current.temperature_2m) + '°C';
+                }
+            } catch (e) { console.warn('[Weather]', e); }
+        }
+        fetchWeather();
+        setInterval(fetchWeather, 600000); // every 10 min
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="js/api.js"></script>
+    <script>
+        // Purge ALL old cached stream IDs (prevents stale/corrupted data)
+        Object.keys(localStorage).forEach(k => { if (k.startsWith('warRoomStreams')) localStorage.removeItem(k); });
+    </script>
+    <script src="js/config.js"></script>
+    <script src="js/feeds.js"></script>
+    <script src="js/widgets.js"></script>
+    <script src="js/livedata.js"></script>
+    <script src="js/lights.js"></script>
+    <script src="data/streams.js"></script>
+    <script src="js/world-drawer.js"></script>
+    <script src="js/app.js"></script>
+    <!-- YouTube API: MUST load after feeds.js so onYouTubeIframeAPIReady can find feeds.buildWall -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        // Fallback: if YT API already loaded or fires late, retry
+        setTimeout(() => {
+            if (document.querySelectorAll('.video-cell').length === 0 && typeof feeds !== 'undefined') {
+                console.log('[Fallback] No video cells found, rebuilding wall...');
+                if (typeof YT !== 'undefined' && YT.Player) {
+                    feeds.buildWall();
+                } else {
+                    // YT API still not ready, wait more
+                    const check = setInterval(() => {
+                        if (typeof YT !== 'undefined' && YT.Player) {
+                            clearInterval(check);
+                            feeds.buildWall();
+                        }
+                    }, 500);
+                    setTimeout(() => clearInterval(check), 15000);
+                }
+            }
+        }, 3000);
+    </script>
+</body>
+
+</html>

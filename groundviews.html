@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="view-transition" content="same-origin">
+    <title>WAR ROOM — Live Ground Views</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+    <script>
+        try {
+            const a = JSON.parse(localStorage.getItem('warroom_auth') || '{}');
+            if (!a.exp || a.exp < Date.now()) { localStorage.removeItem('warroom_auth'); window.location.href = '/login.html'; }
+        }
+        catch (e) { window.location.href = '/login.html'; }
+    </script>
+    <style>
+        @view-transition {
+            navigation: auto;
+        }
+
+        ::view-transition-old(root) {
+            animation: fade-out 0.15s ease-out;
+        }
+
+        ::view-transition-new(root) {
+            animation: fade-in 0.25s ease-in;
+        }
+
+        @keyframes fade-out {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        :root {
+            --bg: #060810;
+            --bg2: #0c0e18;
+            --card: #0f1120;
+            --border: #1a1d30;
+            --red: #ff2020;
+            --green: #00e050;
+            --blue: #2080ff;
+            --amber: #ffaa00;
+            --text: #d0d0e0;
+            --muted: #4a4a6a;
+            --mono: 'JetBrains Mono', monospace;
+            --sans: 'Inter', -apple-system, sans-serif;
+        }
+
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* ── TICKER BAR ── */
+        .ticker {
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            height: 26px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .ticker-time {
+            flex-shrink: 0;
+            padding: 0 10px;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            border-right: 1px solid var(--border);
+            height: 100%;
+            display: flex;
+            align-items: center;
+        }
+
+        .ticker-scroll {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .ticker-text {
+            display: inline-block;
+            white-space: nowrap;
+            animation: scroll-ticker 60s linear infinite;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: var(--amber);
+        }
+
+        @keyframes scroll-ticker {
+            0% {
+                transform: translateX(100%);
+            }
+
+            100% {
+                transform: translateX(-100%);
+            }
+        }
+
+        .ticker-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-right: 40px;
+        }
+
+        .ticker-tag::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            background: var(--red);
+            border-radius: 50%;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* ── TABS ── */
+        .tabs {
+            display: flex;
+            gap: 1px;
+            padding: 3px 6px;
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .tab {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--muted);
+            font-size: 9px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: 700;
+            padding: 5px 14px;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.15s;
+            font-family: var(--sans);
+        }
+
+        .tab:hover {
+            color: #8888a0;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .tab.active {
+            background: rgba(255, 32, 32, 0.1);
+            border: 1px solid rgba(255, 32, 32, 0.25);
+            color: var(--red);
+        }
+
+        /* ── MAIN GRID — 2x2 city sections ── */
+        .main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 2px;
+            padding: 2px;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .main.solo {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+        }
+
+        /* ── CITY SECTION ── */
+        .city-section {
+            background: var(--card);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 2px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+            position: relative;
+        }
+
+        .city-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            background: rgba(0, 0, 0, 0.4);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            flex-shrink: 0;
+            z-index: 5;
+        }
+
+        .city-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .city-dot.live {
+            background: var(--red);
+            animation: blink 1.5s infinite;
+        }
+
+        .city-dot.green {
+            background: var(--green);
+            animation: blink-green 2s infinite;
+        }
+
+        @keyframes blink-green {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        .city-title {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #fff;
+        }
+
+        .city-sub {
+            font-size: 8px;
+            color: var(--muted);
+            margin-left: auto;
+            font-family: var(--mono);
+        }
+
+        .city-expand {
+            background: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--muted);
+            font-size: 8px;
+            padding: 2px 6px;
+            cursor: pointer;
+            margin-left: 4px;
+            border-radius: 2px;
+            font-family: var(--sans);
+            font-weight: 600;
+        }
+
+        .city-expand:hover {
+            background: var(--red);
+            color: #fff;
+            border-color: var(--red);
+        }
+
+        .cam-fs {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 14px;
+            padding: 2px 6px;
+            cursor: pointer;
+            border-radius: 3px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .cam:hover .cam-fs {
+            opacity: 1;
+        }
+
+        .cam-fs:hover {
+            background: var(--red);
+            border-color: var(--red);
+        }
+
+        /* ── CAMERA GRID inside each city ── */
+        .cam-grid {
+            flex: 1;
+            display: grid;
+            gap: 1px;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .cam-grid.g2x2 {
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+        }
+
+        .cam-grid.g3x2 {
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+        }
+
+        .cam-grid.g2x1 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .cam-grid.g1 {
+            grid-template-columns: 1fr;
+        }
+
+        /* ── CAMERA CELL ── */
+        .cam {
+            position: relative;
+            overflow: hidden;
+            background: #000;
+            min-height: 0;
+        }
+
+        .cam iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            pointer-events: none;
+        }
+
+        .cam-num {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-family: var(--mono);
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.3);
+            font-weight: 700;
+            z-index: 3;
+        }
+
+        .cam-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 2px 6px;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .cam-label span {
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.6);
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .cam-live {
+            position: absolute;
+            top: 2px;
+            right: 4px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            z-index: 3;
+        }
+
+        .cam-live-dot {
+            width: 4px;
+            height: 4px;
+            background: var(--green);
+            border-radius: 50%;
+        }
+
+        .cam-live span {
+            font-size: 7px;
+            color: var(--green);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── FOOTER ── */
+        .footer {
+            padding: 2px 8px;
+            background: var(--bg2);
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .footer span {
+            font-size: 7px;
+            color: var(--muted);
+            font-family: var(--mono);
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .footer-live {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .footer-dot {
+            width: 4px;
+            height: 4px;
+            background: var(--green);
+            border-radius: 50%;
+        }
+
+        /* ── EXPANDED VIEW ── */
+        .main.solo .city-section {
+            grid-column: 1;
+            grid-row: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- ── HEADER (same as Page 1) ── -->
+    <header class="header">
+        <div class="header__brand">
+            <div class="live-indicator">
+                <div class="live-dot"></div>LIVE
+            </div>
+            <span class="brand-title">War Room</span>
+            <span class="mode-label">IRAN/ISRAEL</span>
+        </div>
+        <!-- Iran & Israel Clocks -->
+        <div style="display:flex;gap:10px;align-items:center;flex-shrink:0;margin:0 8px;">
+            <div
+                style="display:flex;flex-direction:column;align-items:center;padding:2px 8px;background:rgba(255,32,32,0.08);border:1px solid rgba(255,32,32,0.15);border-radius:4px;">
+                <span
+                    style="font-size:7px;font-weight:800;letter-spacing:1.5px;color:#ff4040;text-transform:uppercase;">🇮🇷
+                    TEHRAN</span>
+                <span id="clockTehran2"
+                    style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#fff;">--:--</span>
+                <span id="wxTehran2" style="font-size:7px;color:#888;">--</span>
+            </div>
+            <div
+                style="display:flex;flex-direction:column;align-items:center;padding:2px 8px;background:rgba(32,128,255,0.08);border:1px solid rgba(32,128,255,0.15);border-radius:4px;">
+                <span
+                    style="font-size:7px;font-weight:800;letter-spacing:1.5px;color:#2080ff;text-transform:uppercase;">🇮🇱
+                    TEL AVIV</span>
+                <span id="clockTelAviv2"
+                    style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#fff;">--:--</span>
+                <span id="wxTelAviv2" style="font-size:7px;color:#888;">--</span>
+            </div>
+        </div>
+        <div class="header__controls">
+            <span class="clock" id="gvClock"></span>
+            <a href="/" class="nav-btn">COMMAND CENTER</a>
+            <button class="nav-btn"
+                style="background:rgba(232,72,85,0.15);border-color:rgba(232,72,85,0.3);color:#e84855;cursor:default;">GROUND
+                VIEWS</button>
+            <a href="/page3.html" class="nav-btn">WORLD MONITOR</a>
+            <button class="nav-btn" onclick="toggleFullscreen()">Fullscreen</button>
+            <button class="nav-btn"
+                onclick="localStorage.removeItem('warroom_auth'); window.location.href='/login.html'"
+                style="background:rgba(255,32,32,0.12);border-color:rgba(255,32,32,0.3);color:#ff4040;">⏻
+                Logout</button>
+        </div>
+    </header>
+    <style>
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+    </style>
+
+    <div class="tabs" id="tabs" style="margin-top:40px;"></div>
+    <div class="main" id="main"></div>
+
+    <footer class="footer">
+        <span>WAR ROOM — LIVE GROUND VIEWS v2.0</span>
+        <span><a href="/" style="color:var(--muted);text-decoration:none;">← COMMAND CENTER</a> · <a href="/page3.html"
+                style="color:var(--muted);text-decoration:none;">WORLD MONITOR →</a></span>
+        <div class="footer-live">
+            <div class="footer-dot"></div><span id="camCount">0</span><span> CAMERAS</span>
+        </div>
+    </footer>
+
+    <script>
+        // ═══════════════════════════════════
+        //  CAMERA DATABASE — City Sections
+        //  channelHandle for auto-detect
+        //  fallbackVideoId as backup
+        // ═══════════════════════════════════
+        const CITY_SECTIONS = {
+            'iran': [
+                {
+                    city: 'TEHRAN', country: 'Iran', dotClass: 'live',
+                    cameras: [
+                        // SGN (Source Global News) multi-cam — 4+ camera grid of Tehran, verified live 24/7
+                        { label: 'Tehran Multi-Cam', handle: '@SourceGlobalSGN', fallback: '-zGuR1qVKrU' },
+                        // InquizeX OSINT — HD camera feeds from across Iran, verified live
+                        { label: 'Iran HD Cams', handle: '@InquizeX', fallback: 'UfhXBrZGtFM' },
+                        // Crannofonix — Middle East + Iran multi-cam view, verified live
+                        { label: 'Iran/ME Live', handle: '@Crannofonix', fallback: 'wqClPIztIgM' },
+                        // Realtime HD cams — Iran, Israel, Middle East OSINT feed
+                        { label: 'Iran OSINT', handle: null, fallback: '5y3dYo-KcsA' },
+                    ],
+                },
+                {
+                    city: 'TEL AVIV', country: 'Israel', dotClass: 'live',
+                    cameras: [
+                        // SGN multi-cam — Israel, Iran, Syria, Middle East 24/7 (Source Global News)
+                        { label: 'SGN Israel Multi', handle: '@SourceGlobalSGN', fallback: 'gmtlJ_m2r5A' },
+                        // WorldCam.tv — Tel Aviv skyline webcam, verified live
+                        { label: 'Tel Aviv Skyline', handle: null, fallback: 'la_x53vhyd8' },
+                        // Multi-cam Tel Aviv + Jerusalem + Haifa — "Massive Escalation" live stream
+                        { label: 'TLV+JLM+Haifa', handle: null, fallback: 'ALMuhi7FQmY' },
+                        // Tel Aviv skyline view — Iran war context stream
+                        { label: 'Tel Aviv View', handle: null, fallback: 'BKhDQi5rOHY' },
+                    ],
+                },
+                {
+                    city: 'JERUSALEM', country: 'Israel', dotClass: 'green',
+                    cameras: [
+                        // EarthCam / Western Wall Heritage Foundation — 24/7 Kotel view
+                        { label: 'Western Wall 24/7', handle: '@TheWesternWall', fallback: 'UyduhBUpO7Q' },
+                        // Mount of Olives 24/7 — Jerusalem panoramic live cam
+                        { label: 'Mt. of Olives', handle: null, fallback: 'kXOjSHqo8dE' },
+                    ],
+                },
+                {
+                    city: 'MIDDLE EAST', country: 'Multi', dotClass: 'green',
+                    cameras: [
+                        // Intel Cams — multi-cam from Iran, Israel, Qatar, etc, verified 24/7
+                        { label: 'ME Multi-Cam', handle: '@IntelCams', fallback: '4E-iFtUM2kk' },
+                        // DD Cyprus — Israel/Gaza/Lebanon multi-cam, verified live
+                        { label: 'Gaza/Lebanon', handle: '@DDCyprus', fallback: 'lanj7b61Mvc' },
+                        // InquizeX OSINT — HD cameras from Israel, Lebanon, Gaza
+                        { label: 'Lebanon Cams', handle: '@InquizeX', fallback: 'PjYM86urFDQ' },
+                        // Makkah Live — Kaaba 24/7 (Saudi Arabia Broadcasting)
+                        { label: 'Mecca Live', handle: null, fallback: 'Gkbv1NfkcK4' },
+                    ],
+                },
+            ],
+            'europe': [
+                {
+                    city: 'KYIV', country: 'Ukraine', dotClass: 'live',
+                    cameras: [
+                        // DW News — Kyiv skyline 24/7 live camera (Deutsche Welle)
+                        { label: 'Kyiv Skyline', handle: '@DWNews', fallback: '-Q7FuPINDjA' },
+                        // Ukraine Live Cam — Odessa port camera
+                        { label: 'Odessa Port', handle: '@UkraineLiveCam', fallback: 'e2gC37ILQmk' },
+                    ],
+                },
+                {
+                    city: 'PARIS', country: 'France', dotClass: 'green',
+                    cameras: [
+                        // Palais d'Iéna — Eiffel Tower view webcam
+                        { label: 'Eiffel Tower', handle: '@PalaisIena', fallback: 'OzYp4NRZlwQ' },
+                        // St. Petersburg Russia — live city cam
+                        { label: 'St. Petersburg', handle: '@SPBLiveCam', fallback: 'CjtIYbmVfck' },
+                    ],
+                },
+                {
+                    city: 'LONDON', country: 'UK', dotClass: 'green',
+                    cameras: [
+                        // EarthCam — Tower Bridge / Thames panorama
+                        { label: 'Tower Bridge', handle: '@EarthCam', fallback: 'Lxqcg1qt0XU' },
+                        // DW News — verified live 24/7 (fallback: news stream)
+                        { label: 'DW News Live', handle: '@DWNews', fallback: 'LuKwFajn37U' },
+                    ],
+                },
+                {
+                    city: 'UKRAINE', country: 'Multi', dotClass: 'live',
+                    cameras: [
+                        // SGN multi-cam — covers Ukraine conflict areas
+                        { label: 'SGN Multi-Cam', handle: '@SourceGlobalSGN', fallback: 'fot8_pXYqGQ' },
+                        // DD Cyprus — Middle East + Lebanon licensed cams
+                        { label: 'ME/UKR Multi', handle: '@DDCyprus', fallback: 'TVy8Jgw0M7M' },
+                    ],
+                },
+            ],
+            'americas': [
+                {
+                    city: 'WASHINGTON DC', country: 'USA', dotClass: 'green',
+                    cameras: [
+                        // Axis Communications — Capitol building webcam
+                        { label: 'Capitol Live', handle: '@AxisCommunications', fallback: '1wV9lLe14aU' },
+                        // EarthCam — verified live NYC/DC cam
+                        { label: 'EarthCam DC', handle: '@EarthCam', fallback: 'kLoFxVhRWtQ' },
+                    ],
+                },
+                {
+                    city: 'NEW YORK', country: 'USA', dotClass: 'green',
+                    cameras: [
+                        // EarthCam — Times Square 24/7
+                        { label: 'Times Square', handle: '@EarthCam', fallback: '4qyZLflp-sI' },
+                        // Venice Beach Hotel — LA beach cam
+                        { label: 'LA Venice Beach', handle: '@VeniceVHotel', fallback: 'EO_1LWqsCNE' },
+                    ],
+                },
+                {
+                    city: 'MIAMI', country: 'USA', dotClass: 'green',
+                    cameras: [
+                        // Florida Live Cams — South Beach 24/7
+                        { label: 'South Beach', handle: '@FloridaLiveCams', fallback: '5YCajRjvWCg' },
+                        // Dubai Live — Burj Khalifa 24/7 (bonus international view)
+                        { label: 'Dubai Burj', handle: null, fallback: 'xKYvWgyxXXg' },
+                    ],
+                },
+                {
+                    city: 'NEWS', country: 'Live', dotClass: 'green',
+                    cameras: [
+                        // Bloomberg TV — 24/7 financial news
+                        { label: 'Bloomberg', handle: '@markets', fallback: 'iEpJwprxDdk' },
+                        // Sky News — 24/7 UK/World news
+                        { label: 'Sky News', handle: '@SkyNews', fallback: 'uvviIF4725I' },
+                    ],
+                },
+            ],
+            'asia': [
+                {
+                    city: 'TAIPEI', country: 'Taiwan', dotClass: 'green',
+                    cameras: [
+                        // Jacky Wu — Taipei city live cam
+                        { label: 'Taipei Live', handle: '@JackyWuTaipei', fallback: 'z_fY1pj1VBw' },
+                        // SkylineWebcams — Shanghai Bund skyline
+                        { label: 'Shanghai', handle: '@SkylineWebcams', fallback: '76EwqI5XZIc' },
+                    ],
+                },
+                {
+                    city: 'TOKYO', country: 'Japan', dotClass: 'green',
+                    cameras: [
+                        // TokyoLiveCam4K — Shibuya crossing
+                        { label: 'Shibuya 4K', handle: '@TokyoLiveCam4K', fallback: '4pu9sF5Qssw' },
+                        // Seoul UN Village live cam
+                        { label: 'Seoul Live', handle: '@UNvillage_live', fallback: '-JhoMGoAfFc' },
+                    ],
+                },
+                {
+                    city: 'SYDNEY', country: 'Australia', dotClass: 'green',
+                    cameras: [
+                        // WebcamSydney — Harbour Bridge view
+                        { label: 'Harbour Bridge', handle: '@WebcamSydney', fallback: '7pcL-0Wo77U' },
+                        // CNA — Channel News Asia 24/7
+                        { label: 'CNA News', handle: '@channelnewsasia', fallback: 'XWq5kBlakcQ' },
+                    ],
+                },
+                {
+                    city: 'NEWS ASIA', country: 'Live', dotClass: 'green',
+                    cameras: [
+                        // NHK World Japan — 24/7 English news from Japan
+                        { label: 'NHK World', handle: '@NHKWORLDJAPAN', fallback: 'f0lYfG_vY_U' },
+                        // Al Jazeera English — 24/7 world news
+                        { label: 'Al Jazeera', handle: '@AlJazeeraEnglish', fallback: 'gCNeDWCI0vo' },
+                    ],
+                },
+            ],
+        };
+
+        const REGIONS = [
+            { key: 'iran', label: '⚠ IRAN ATTACKS' },
+            { key: 'europe', label: 'EUROPE' },
+            { key: 'americas', label: 'AMERICAS' },
+            { key: 'asia', label: 'ASIA-PAC' },
+        ];
+
+        let currentRegion = 'iran';
+        let expandedCity = null;
+
+        // ── Auto-detect live video IDs ──
+        const liveCache = {};
+        async function detectLive(handle) {
+            if (!handle) return null;
+            if (liveCache[handle] && Date.now() - liveCache[handle].ts < 300000) return liveCache[handle].videoId;
+            try {
+                const r = await fetch(`/api/youtube/live?channel=${encodeURIComponent(handle)}`);
+                const d = await r.json();
+                if (d.videoId) { liveCache[handle] = { videoId: d.videoId, ts: Date.now() }; return d.videoId; }
+            } catch (e) { console.warn('[LiveDetect]', handle, e); }
+            return null;
+        }
+
+        function embedUrl(videoId) {
+            return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&enablejsapi=0`;
+        }
+
+        // ── Build Tabs ──
+        function buildTabs() {
+            document.getElementById('tabs').innerHTML =
+                `<a href="/" class="tab" style="text-decoration:none;margin-right:12px;background:rgba(255,32,32,0.15);border:1px solid rgba(255,32,32,0.4);color:#ff4040;font-size:10px;padding:5px 16px;font-weight:800;">← PAGE 1</a>` +
+                REGIONS.map(r =>
+                    `<button class="tab${r.key === currentRegion ? ' active' : ''}" onclick="switchRegion('${r.key}')">${r.label}</button>`
+                ).join('');
+        }
+
+        // ── Render ──
+        function render() {
+            const main = document.getElementById('main');
+            const sections = CITY_SECTIONS[currentRegion] || [];
+            let totalCams = 0;
+
+            if (expandedCity !== null) {
+                const sec = sections[expandedCity];
+                if (!sec) { expandedCity = null; render(); return; }
+                main.className = 'main solo';
+                const gridClass = sec.cameras.length <= 2 ? 'g2x1' : sec.cameras.length <= 4 ? 'g2x2' : 'g3x2';
+                main.innerHTML = `
+                <div class="city-section">
+                    <div class="city-header">
+                        <div class="city-dot ${sec.dotClass}"></div>
+                        <span class="city-title">${sec.city}</span>
+                        <span class="city-sub">${sec.country}</span>
+                        <button class="city-expand" onclick="collapseCity()">⊞ GRID</button>
+                    </div>
+                    <div class="cam-grid ${gridClass}">
+                        ${sec.cameras.map((c, i) => `
+                            <div class="cam" id="cam-${expandedCity}-${i}">
+                                <span class="cam-num">${i + 1}</span>
+                                <iframe src="${embedUrl(c.fallback || '')}" allow="autoplay; encrypted-media" loading="lazy"></iframe>
+                                <div class="cam-label"><span>${c.label}</span></div>
+                                <div class="cam-live"><div class="cam-live-dot"></div><span>LIVE</span></div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+                totalCams = sec.cameras.length;
+            } else {
+                main.className = 'main';
+                main.innerHTML = sections.map((sec, si) => {
+                    const gridClass = sec.cameras.length <= 1 ? 'g1' : sec.cameras.length <= 2 ? 'g2x1' : sec.cameras.length <= 4 ? 'g2x2' : 'g3x2';
+                    totalCams += sec.cameras.length;
+                    return `
+                    <div class="city-section">
+                        <div class="city-header">
+                            <div class="city-dot ${sec.dotClass}"></div>
+                            <span class="city-title">${sec.city}</span>
+                            <span class="city-sub">${sec.country}</span>
+                            <button class="city-expand" onclick="expandCity(${si})">⛶</button>
+                        </div>
+                        <div class="cam-grid ${gridClass}">
+                            ${sec.cameras.map((c, i) => `
+                                <div class="cam" id="cam-${si}-${i}" ondblclick="fullscreenCam(this)">
+                                    <span class="cam-num">${i + 1}</span>
+                                    <button class="cam-fs" onclick="event.stopPropagation(); fullscreenCam(this.parentElement)" title="Fullscreen">⛶</button>
+                                    <iframe src="${embedUrl(c.fallback || '')}" allow="autoplay; encrypted-media; fullscreen" loading="lazy" allowfullscreen></iframe>
+                                    <div class="cam-label"><span>${c.label}</span></div>
+                                    <div class="cam-live"><div class="cam-live-dot"></div><span>LIVE</span></div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                }).join('');
+            }
+
+            document.getElementById('camCount').textContent = totalCams;
+
+            // Auto-detect live video IDs in background
+            sections.forEach((sec, si) => {
+                sec.cameras.forEach((cam, ci) => {
+                    if (cam.handle) {
+                        detectLive(cam.handle).then(vid => {
+                            if (vid && vid !== cam.fallback) {
+                                const iframe = document.querySelector(`#cam-${expandedCity !== null ? expandedCity : si}-${ci} iframe`);
+                                if (iframe) iframe.src = embedUrl(vid);
+                            }
+                        });
+                    }
+                });
+            });
+
+        }
+
+        function switchRegion(region) {
+            currentRegion = region;
+            expandedCity = null;
+            buildTabs();
+            render();
+        }
+
+        function fullscreenCam(el) {
+            const iframe = el.querySelector('iframe');
+            const target = iframe || el;
+            if (target.requestFullscreen) target.requestFullscreen();
+            else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // ESC exits fullscreen
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+        });
+
+        function expandCity(idx) {
+            expandedCity = idx;
+            render();
+        }
+
+        function collapseCity() {
+            expandedCity = null;
+            render();
+        }
+
+        // ── Clocks (12-hour, matching Page 1) ──
+        function tick() {
+            const fmt = (tz) => new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            const te = document.getElementById('clockTehran2');
+            const ta = document.getElementById('clockTelAviv2');
+            const cl = document.getElementById('gvClock');
+            if (te) te.textContent = fmt('Asia/Tehran');
+            if (ta) ta.textContent = fmt('Asia/Jerusalem');
+            if (cl) cl.textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZoneName: 'short' });
+        }
+
+        // Weather
+        const WMO_ICONS = { 0: '☀️', 1: '🌤', 2: '⛅', 3: '☁️', 45: '🌫', 48: '🌫', 51: '🌦', 53: '🌧', 55: '🌧', 61: '🌧', 63: '🌧', 65: '🌧️', 71: '🌨', 73: '🌨', 75: '🌨', 80: '🌦', 81: '🌧', 82: '⛈', 95: '⛈', 96: '⛈', 99: '⛈' };
+        async function fetchWeather() {
+            try {
+                const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=35.69,32.09&longitude=51.39,34.78&current=temperature_2m,weathercode&timezone=auto');
+                const d = await r.json();
+                if (Array.isArray(d)) {
+                    const [tehran, tlv] = d;
+                    const wTe = document.getElementById('wxTehran2');
+                    const wTa = document.getElementById('wxTelAviv2');
+                    if (wTe && tehran.current) wTe.textContent = (WMO_ICONS[tehran.current.weathercode] || '') + ' ' + Math.round(tehran.current.temperature_2m) + '°C';
+                    if (wTa && tlv.current) wTa.textContent = (WMO_ICONS[tlv.current.weathercode] || '') + ' ' + Math.round(tlv.current.temperature_2m) + '°C';
+                }
+            } catch (e) { }
+        }
+        fetchWeather();
+        setInterval(fetchWeather, 600000);
+
+        // ── Init ──
+        buildTabs();
+        render();
+        tick();
+        setInterval(tick, 1000);
+    </script>
+</body>
+
+</html>

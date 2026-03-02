@@ -1,0 +1,7 @@
+node_modules/
+.x-session/
+.x-cookies.json
+x-tweets.json
+__pycache__/
+*.pyc
+.DS_Store
