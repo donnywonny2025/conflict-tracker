@@ -719,13 +719,9 @@
             const payload = JSON.parse(atob(response.credential.split('.')[1]));
             const email = payload.email.toLowerCase();
             const name = payload.name || payload.email.split('@')[0];
-            if (AUTHORIZED_EMAILS[email]) {
-                grantAccess(AUTHORIZED_EMAILS[email], 'google', email);
-            } else {
-                const err = document.getElementById('loginError');
-                err.textContent = 'Email not authorized. Contact Jeff for access.';
-                err.style.display = 'block';
-            }
+            // Allow any Google account to sign in
+            const displayName = AUTHORIZED_EMAILS[email] || name;
+            grantAccess(displayName, 'google', email);
         }
 
         function initGoogleSignIn() {
