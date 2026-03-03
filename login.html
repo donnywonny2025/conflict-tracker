@@ -132,6 +132,12 @@
             animation: staggerIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
+        /* Fallback: ensure visible even if animation fails */
+        .anim-ready .anim-enter {
+            opacity: 1;
+            transform: none;
+        }
+
         .anim-enter:nth-child(1) {
             animation-delay: 0.1s;
         }
@@ -771,6 +777,9 @@
                 err.style.display = 'block';
             }
         }
+
+        // Fallback: ensure form is visible after animations should have completed
+        setTimeout(() => { document.querySelector('.login-wrap').classList.add('anim-ready'); }, 1500);
 
         // Auto-login if still valid
         try {
