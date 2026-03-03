@@ -1,12 +1,106 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WAR ROOM — World Monitor</title>
-    <script>window.location.href = '/worldmonitor/index.html';</script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <script>
+        try {
+            const a = JSON.parse(localStorage.getItem('warroom_auth') || '{}');
+            if (!a.exp || a.exp < Date.now()) { localStorage.removeItem('warroom_auth'); window.location.href = '/login.html'; }
+        } catch (e) { window.location.href = '/login.html'; }
+    </script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .monitor-frame {
+            flex: 1;
+            border: none;
+            width: 100%;
+            min-height: 0;
+        }
+    </style>
 </head>
 
-<body></body>
+<body>
+    <div class="vignette"></div>
+
+    <!-- ── HEADER (identical to Command Center & Ground Views) ── -->
+    <header class="header">
+        <div class="header__brand">
+            <div class="live-indicator">
+                <div class="live-dot"></div>LIVE
+            </div>
+            <span class="brand-title">War Room</span>
+            <span class="mode-label">WORLD MONITOR</span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-shrink:0;margin:0 8px;">
+            <div
+                style="display:flex;flex-direction:column;align-items:center;padding:2px 8px;background:rgba(255,32,32,0.08);border:1px solid rgba(255,32,32,0.15);border-radius:4px;">
+                <span
+                    style="font-size:7px;font-weight:800;letter-spacing:1.5px;color:#ff4040;text-transform:uppercase;">TEHRAN</span>
+                <span id="clockTehran"
+                    style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#fff;">--:--</span>
+            </div>
+            <div
+                style="display:flex;flex-direction:column;align-items:center;padding:2px 8px;background:rgba(32,128,255,0.08);border:1px solid rgba(32,128,255,0.15);border-radius:4px;">
+                <span
+                    style="font-size:7px;font-weight:800;letter-spacing:1.5px;color:#2080ff;text-transform:uppercase;">TEL
+                    AVIV</span>
+                <span id="clockTelAviv"
+                    style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#fff;">--:--</span>
+            </div>
+        </div>
+        <div class="header__ticker">
+            <span class="ticker" id="ticker"></span>
+        </div>
+        <div class="header__controls">
+            <span class="clock" id="clock"></span>
+            <a href="/" class="nav-btn" style="text-decoration:none;">COMMAND CENTER</a>
+            <a href="/groundviews.html" class="nav-btn" style="text-decoration:none;">GROUND VIEWS</a>
+            <button class="nav-btn"
+                style="background:rgba(232,72,85,0.15);border-color:rgba(232,72,85,0.3);color:#e84855;cursor:default;">WORLD
+                MONITOR</button>
+            <button class="nav-btn" onclick="toggleFullscreen()">Fullscreen</button>
+            <button class="nav-btn"
+                onclick="localStorage.removeItem('warroom_auth'); window.location.href='/login.html'"
+                style="background:rgba(255,32,32,0.12);border-color:rgba(255,32,32,0.3);color:#ff4040;">Logout</button>
+        </div>
+    </header>
+
+    <!-- ── FULL WORLD MONITOR APP (iframe) ── -->
+    <iframe class="monitor-frame" src="/worldmonitor/index.html" allow="autoplay; fullscreen; encrypted-media"></iframe>
+
+    <script>
+        function tickClocks() {
+            const now = new Date();
+            const fmt = (tz) => now.toLocaleTimeString('en-US', {
+                timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+            });
+            document.getElementById('clockTehran').textContent = fmt('Asia/Tehran');
+            document.getElementById('clockTelAviv').textContent = fmt('Asia/Jerusalem');
+            document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', {
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+            }) + ' EST';
+        }
+        tickClocks();
+        setInterval(tickClocks, 1000);
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+        }
+    </script>
+</body>
 
 </html>
