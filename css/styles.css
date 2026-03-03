@@ -468,6 +468,66 @@ body::after {
     box-shadow: inset 0 0 20px rgba(255, 48, 48, 0.08), 0 0 15px rgba(255, 48, 48, 0.1);
 }
 
+.ext-link {
+    position: absolute;
+    bottom: 22px;
+    left: 6px;
+    z-index: 20;
+    font-size: 13px;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.4);
+    text-decoration: none;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 3px 5px;
+    border-radius: 3px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.ext-link:hover {
+    opacity: 1;
+    color: #fff;
+    background: rgba(255, 64, 64, 0.6);
+}
+
+/* ── Stream Page Paginator ── */
+.wall-paginator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0 2px;
+    width: 100%;
+}
+
+.page-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.page-dot:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.page-dot.active {
+    color: #fff;
+    background: var(--accent-red);
+    border-color: var(--accent-red);
+    box-shadow: 0 0 8px rgba(255, 48, 48, 0.3);
+}
+
 .video-cell .player-container {
     width: 100%;
     height: 100%;

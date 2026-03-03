@@ -4,6 +4,9 @@
    ═══════════════════════════════════════════ */
 
 const feeds = (() => {
+    // Page system: maps page numbers to preset keys
+    const PAGE_MAP = { 1: 'iran', 2: 'iran2' };
+    let currentPage = 1;
     let streams = [...CONFIG.presets.iran];
     let players = [];
     let playersReady = [];
@@ -48,6 +51,45 @@ const feeds = (() => {
             : '<span class="material-symbols-outlined">volume_off</span>MUTED';
     }
 
+    // ── PAGE SWITCHING ──
+    function destroyPlayers() {
+        for (let i = 0; i < players.length; i++) {
+            if (players[i] && typeof players[i].destroy === 'function') {
+                try { players[i].destroy(); } catch (e) { }
+            }
+        }
+        players = [];
+        playersReady = [];
+        activeIndex = -1;
+    }
+
+    function setPage(page) {
+        const preset = PAGE_MAP[page];
+        if (!preset || !CONFIG.presets[preset]) return;
+        destroyPlayers();
+        currentPage = page;
+        streams = [...CONFIG.presets[preset]];
+        buildWall();
+    }
+
+    function renderPaginator() {
+        const wall = document.getElementById('videoWall');
+        if (!wall) return;
+        let nav = document.getElementById('wallPaginator');
+        if (!nav) {
+            nav = document.createElement('div');
+            nav.id = 'wallPaginator';
+            nav.className = 'wall-paginator';
+            wall.parentElement.appendChild(nav);
+        }
+        const totalPages = Object.keys(PAGE_MAP).length;
+        let html = '';
+        for (let p = 1; p <= totalPages; p++) {
+            html += `<span class="page-dot ${p === currentPage ? 'active' : ''}" onclick="feeds.setPage(${p})" title="Page ${p}">${p}</span>`;
+        }
+        nav.innerHTML = html;
+    }
+
     // ── BUILD WALL ──
     function buildWall() {
         const wall = document.getElementById('videoWall');
@@ -84,6 +126,7 @@ const feeds = (() => {
                     <span class="audio-badge" id="badge-${i}" style="top:auto;bottom:20px;right:4px;">
                         <span class="material-symbols-outlined">volume_off</span>MUTED
                     </span>
+                    <a class="ext-link" href="https://www.youtube.com/watch?v=${ytId}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open in YouTube">↗</a>
                     <div class="cell-controls">
                         <button class="cell-btn cell-btn--fav ${favorites[stream.id] ? 'is-fav' : ''}" id="fav-${i}" onclick="event.stopPropagation(); feeds.toggleFavorite(${i})" title="Favorite">${favorites[stream.id] ? '❤️' : '🤍'}</button>
                         <button class="cell-btn cell-btn--solo" onclick="event.stopPropagation(); feeds.soloCell(${i})">◉ Solo</button>
@@ -121,6 +164,29 @@ const feeds = (() => {
                     <span class="audio-badge" id="badge-${i}">
                         <span class="material-symbols-outlined">volume_off</span>MUTED
                     </span>
+                    <a class="ext-link" href="${stream.id}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open source">↗</a>
+                    <div class="cell-controls">
+                        <button class="cell-btn cell-btn--fav ${favorites[stream.id] ? 'is-fav' : ''}" id="fav-${i}" onclick="event.stopPropagation(); feeds.toggleFavorite(${i})" title="Favorite">${favorites[stream.id] ? '❤️' : '🤍'}</button>
+                        <button class="cell-btn cell-btn--solo" onclick="event.stopPropagation(); feeds.soloCell(${i})">◉ Solo</button>
+                        <button class="cell-btn" onclick="event.stopPropagation(); feeds.fullscreenCell(${i})">⛶ Full</button>
+                    </div>
+                `;
+                wall.appendChild(cell);
+                players[i] = null;
+                playersReady[i] = false;
+            } else if (stream.type === 'hls' && stream.url) {
+                // HLS stream — use proxied HLS via video element
+                const proxyUrl = `/api/proxy?url=${encodeURIComponent(stream.url)}`;
+                cell.innerHTML = `
+                    ${stream.region ? `<span class="region-tag">${stream.region}</span>` : ''}
+                    <video src="${proxyUrl}" autoplay muted playsinline style="width:100%;height:100%;position:absolute;top:0;left:0;object-fit:cover;"></video>
+                    <div class="click-overlay" onclick="feeds.selectCell(${i})" ondblclick="feeds.soloCell(${i})"></div>
+                    <span class="label">${stream.label || 'Stream ' + (i + 1)}</span>
+                    <span class="live-badge"><span class="live-dot-green"></span>LIVE</span>
+                    <span class="audio-badge" id="badge-${i}" style="top:auto;bottom:20px;right:4px;">
+                        <span class="material-symbols-outlined">volume_off</span>MUTED
+                    </span>
+                    <a class="ext-link" href="${stream.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open source">↗</a>
                     <div class="cell-controls">
                         <button class="cell-btn cell-btn--fav ${favorites[stream.id] ? 'is-fav' : ''}" id="fav-${i}" onclick="event.stopPropagation(); feeds.toggleFavorite(${i})" title="Favorite">${favorites[stream.id] ? '❤️' : '🤍'}</button>
                         <button class="cell-btn cell-btn--solo" onclick="event.stopPropagation(); feeds.soloCell(${i})">◉ Solo</button>
@@ -143,6 +209,7 @@ const feeds = (() => {
                 playersReady[i] = false;
             }
         });
+        renderPaginator();
     }
 
     // ── AUDIO SELECT ──
@@ -403,7 +470,8 @@ const feeds = (() => {
     return {
         buildWall, selectCell, muteAll, soloCell, exitSolo, fullscreenCell,
         openEditor, closeEditor, addStream, removeStream, loadPreset, saveStreams, syncFromBackend,
-        getActiveIndex, toggleFavorite, getFavorites, loadFavorites, switchLiveTab, resolveAndBuild
+        getActiveIndex, toggleFavorite, getFavorites, loadFavorites, switchLiveTab, resolveAndBuild,
+        setPage, renderPaginator
     };
 })();
 

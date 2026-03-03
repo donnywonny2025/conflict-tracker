@@ -73,6 +73,17 @@ const CONFIG = {
             { type: 'youtube', id: 'zguvqv2pqTs', label: 'ILTV Israel', region: 'ISRAEL' },
             { type: 'youtube', id: 'GzIGQs7dkos', label: 'WION', region: 'INDIA' },
         ],
+        'iran2': [
+            { type: 'youtube', id: 'QliL4CGc7iY', label: 'GB News', region: 'UK' },
+            { type: 'youtube', id: 'ZvdiJUYGBis', label: 'LiveNOW from FOX', region: 'USA' },
+            { type: 'youtube', id: 'pykpO5kQJ98', label: 'Euronews', region: 'EU' },
+            { type: 'youtube', id: 'KctE56sB5oo', label: 'NDTV 24x7', region: 'INDIA' },
+            { type: 'youtube', id: 'XWq5kBlakcQ', label: 'CNA', region: 'SINGAPORE' },
+            { type: 'youtube', id: 'NQjabLGdP5g', label: 'Africanews', region: 'PAN-AFRICA' },
+            { type: 'youtube', id: 'rr2e9YNQO4Q', label: 'Sky News Australia', region: 'AUSTRALIA' },
+            { type: 'hls', id: 'presstv', url: 'https://live.presstv.ir/hls/presstv.m3u8', label: 'Press TV (Iran)', region: 'IRAN' },
+            { type: 'youtube', id: 'ScdUZNkwcYc', label: 'Espreso TV', region: 'UKRAINE' },
+        ],
         world: [
             { type: 'youtube', id: 'gCNeDWCI0vo', label: 'Al Jazeera', region: 'QATAR' },
             { type: 'youtube', id: 'NygUCOEHrF8', label: 'Sky News', region: 'UK' },
