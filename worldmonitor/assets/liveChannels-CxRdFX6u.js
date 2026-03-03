@@ -1,0 +1,1 @@
+import"./modulepreload-polyfill-B5Qt9EMX.js";/* empty css             */import{dG as i}from"./panels-B6Xz1LA5.js";import{initLiveChannelsWindow as o}from"./live-channels-window-CmbwmIhT.js";import"./deck-stack-Chht7LXF.js";import"./d3-XmIvo93E.js";import"./i18n-VWbTNjcU.js";async function r(){await i(),o()}r().catch(console.error);
