@@ -11,7 +11,7 @@ from urllib.parse import urljoin, quote
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse, HTMLResponse
 from pydantic import BaseModel
 import httpx
 
@@ -1077,6 +1077,18 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 app.add_middleware(NoCacheMiddleware)
 
 STATIC_DIR = Path(__file__).parent
+
+@app.get("/live")
+async def live_page():
+    return FileResponse(str(STATIC_DIR / "live.html"))
+
+@app.get("/director")
+async def director_page():
+    p = STATIC_DIR / "director.html"
+    if p.exists():
+        return FileResponse(str(p))
+    return HTMLResponse("<h1>Director page coming soon</h1>")
+
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
 

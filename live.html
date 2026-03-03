@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920,height=1080">
+    <title>WAR ROOM — LIVE BROADCAST</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a14;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            width: 1920px;
+            height: 1080px;
+        }
+
+        /* ── LAYOUTS ── */
+        .layout-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 3px;
+            width: 1920px;
+            height: 1020px;
+            background: #0a0a14;
+        }
+
+        .layout-solo {
+            width: 1920px;
+            height: 1020px;
+        }
+
+        .layout-solo .stream-cell {
+            width: 100%;
+            height: 100%;
+        }
+
+        .layout-featured {
+            display: grid;
+            grid-template-columns: 3fr 1fr;
+            grid-template-rows: 1fr;
+            gap: 3px;
+            width: 1920px;
+            height: 1020px;
+        }
+
+        .layout-featured .sidebar {
+            display: grid;
+            grid-template-rows: repeat(3, 1fr);
+            gap: 3px;
+        }
+
+        /* ── STREAM CELLS ── */
+        .stream-cell {
+            position: relative;
+            background: #111;
+            overflow: hidden;
+        }
+
+        .stream-cell iframe,
+        .stream-cell video {
+            width: 100%;
+            height: 100%;
+            border: none;
+            object-fit: cover;
+        }
+
+        .stream-label {
+            position: absolute;
+            bottom: 8px;
+            left: 10px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.85);
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .stream-region {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: 'Rajdhani', sans-serif;
+            text-transform: uppercase;
+            background: rgba(255, 48, 48, 0.8);
+            border-radius: 2px;
+            letter-spacing: 1px;
+        }
+
+        .live-dot {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 8px;
+            height: 8px;
+            background: #00ff66;
+            border-radius: 50%;
+            box-shadow: 0 0 6px #00ff66;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        /* ── LOWER THIRD ── */
+        .lower-third {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(90deg, rgba(200, 20, 20, 0.95) 0%, rgba(140, 10, 10, 0.9) 100%);
+            display: flex;
+            align-items: center;
+            padding: 0 30px;
+            z-index: 100;
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .lower-third.visible {
+            transform: translateY(0);
+        }
+
+        .lower-third__tag {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            padding: 4px 12px;
+            background: rgba(0, 0, 0, 0.4);
+            margin-right: 20px;
+            white-space: nowrap;
+        }
+
+        .lower-third__text {
+            font-family: 'Inter', sans-serif;
+            font-size: 18px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ── TICKER ── */
+        .ticker-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 36px;
+            background: rgba(10, 10, 20, 0.95);
+            border-top: 2px solid #c81414;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            z-index: 50;
+        }
+
+        .ticker-label {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            padding: 0 16px;
+            color: #ff3030;
+            white-space: nowrap;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .ticker-scroll {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .ticker-content {
+            display: flex;
+            white-space: nowrap;
+            animation: tickerScroll 60s linear infinite;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .ticker-content span {
+            padding: 0 40px;
+        }
+
+        .ticker-content span::before {
+            content: '●';
+            margin-right: 12px;
+            color: #ff3030;
+            font-size: 8px;
+        }
+
+        @keyframes tickerScroll {
+            from {
+                transform: translateX(0);
+            }
+
+            to {
+                transform: translateX(-50%);
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Stream Container -->
+    <div id="streamContainer" class="layout-grid"></div>
+
+    <!-- Lower Third Overlay -->
+    <div id="lowerThird" class="lower-third">
+        <span class="lower-third__tag" id="ltTag">BREAKING</span>
+        <span class="lower-third__text" id="ltText">Iran fires missiles at US bases across Middle East</span>
+    </div>
+
+    <!-- Ticker Bar -->
+    <div id="tickerBar" class="ticker-bar">
+        <span class="ticker-label">🔴 LIVE</span>
+        <div class="ticker-scroll">
+            <div class="ticker-content" id="tickerContent"></div>
+        </div>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script>
+        // ── LIVE OUTPUT ENGINE ──
+        // Controlled via BroadcastChannel from Director page
+        const channel = new BroadcastChannel('warroom-broadcast');
+        let currentLayout = 'grid';
+        let currentPreset = 'iran';
+        let streams = [...CONFIG.presets.iran];
+
+        // ── RENDER ──
+        function renderStreams() {
+            const container = document.getElementById('streamContainer');
+            container.innerHTML = '';
+            container.className = `layout-${currentLayout}`;
+
+            if (currentLayout === 'solo') {
+                // Show single stream full screen
+                const s = streams[window._soloIndex || 0];
+                const cell = makeCell(s, 0);
+                container.appendChild(cell);
+            } else if (currentLayout === 'featured') {
+                // Big stream + 3 sidebar
+                const main = makeCell(streams[window._featuredIndex || 0], 0);
+                container.appendChild(main);
+                const sidebar = document.createElement('div');
+                sidebar.className = 'sidebar';
+                const sideStreams = streams.filter((_, i) => i !== (window._featuredIndex || 0)).slice(0, 3);
+                sideStreams.forEach((s, i) => sidebar.appendChild(makeCell(s, i + 1)));
+                container.appendChild(sidebar);
+            } else {
+                // 3x3 Grid
+                streams.forEach((s, i) => container.appendChild(makeCell(s, i)));
+            }
+        }
+
+        function makeCell(stream, index) {
+            const cell = document.createElement('div');
+            cell.className = 'stream-cell';
+
+            const ytId = stream.id && /^[\w-]{11}$/.test(stream.id) ? stream.id : null;
+
+            if (stream.type === 'youtube' && ytId) {
+                cell.innerHTML = `
+                    <iframe src="https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1"
+                        allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                    ${stream.region ? `<span class="stream-region">${stream.region}</span>` : ''}
+                    <span class="live-dot"></span>
+                    <span class="stream-label">${stream.label || ''}</span>
+                `;
+            } else if (stream.type === 'hls' && stream.url) {
+                cell.innerHTML = `
+                    <video src="/api/proxy?url=${encodeURIComponent(stream.url)}" autoplay muted playsinline></video>
+                    ${stream.region ? `<span class="stream-region">${stream.region}</span>` : ''}
+                    <span class="live-dot"></span>
+                    <span class="stream-label">${stream.label || ''}</span>
+                `;
+            }
+            return cell;
+        }
+
+        // ── LOWER THIRD ──
+        function showLowerThird(tag, text, duration = 8000) {
+            document.getElementById('ltTag').textContent = tag;
+            document.getElementById('ltText').textContent = text;
+            document.getElementById('lowerThird').classList.add('visible');
+            if (duration > 0) {
+                setTimeout(() => document.getElementById('lowerThird').classList.remove('visible'), duration);
+            }
+        }
+        function hideLowerThird() {
+            document.getElementById('lowerThird').classList.remove('visible');
+        }
+
+        // ── TICKER ──
+        function loadTicker() {
+            const tc = document.getElementById('tickerContent');
+            const items = CONFIG.ticker || [];
+            const html = items.map(t => `<span>${t}</span>`).join('');
+            tc.innerHTML = html + html; // Duplicate for seamless loop
+        }
+
+        // ── BROADCAST CHANNEL LISTENER ──
+        channel.onmessage = (e) => {
+            const { action, data } = e.data;
+            switch (action) {
+                case 'grid':
+                    currentLayout = 'grid';
+                    renderStreams();
+                    break;
+                case 'solo':
+                    currentLayout = 'solo';
+                    window._soloIndex = data.index || 0;
+                    renderStreams();
+                    break;
+                case 'featured':
+                    currentLayout = 'featured';
+                    window._featuredIndex = data.index || 0;
+                    renderStreams();
+                    break;
+                case 'preset':
+                    currentPreset = data.preset;
+                    streams = [...(CONFIG.presets[data.preset] || CONFIG.presets.iran)];
+                    renderStreams();
+                    break;
+                case 'page':
+                    const pageMap = { 1: 'iran', 2: 'iran2' };
+                    streams = [...(CONFIG.presets[pageMap[data.page]] || CONFIG.presets.iran)];
+                    renderStreams();
+                    break;
+                case 'lower':
+                    showLowerThird(data.tag || 'BREAKING', data.text, data.duration || 8000);
+                    break;
+                case 'hideLower':
+                    hideLowerThird();
+                    break;
+                case 'ticker':
+                    CONFIG.ticker = data.items;
+                    loadTicker();
+                    break;
+            }
+        };
+
+        // ── INIT ──
+        renderStreams();
+        loadTicker();
+    </script>
+</body>
+
+</html>
