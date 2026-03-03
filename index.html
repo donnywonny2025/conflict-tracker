@@ -153,15 +153,17 @@
         </div>
         <div class="header__controls">
             <span class="clock" id="clock"></span>
-            <button class="nav-btn" id="soloExitBtn" style="display:none" onclick="feeds.exitSolo()">✕ Exit
-                Solo</button>
+            <button class="nav-btn" id="soloExitBtn" style="display:none" onclick="feeds.exitSolo()">Exit Solo</button>
+            <button class="nav-btn"
+                style="background:rgba(232,72,85,0.15);border-color:rgba(232,72,85,0.3);color:#e84855;cursor:default;">COMMAND
+                CENTER</button>
+            <a href="/groundviews.html" class="nav-btn" style="text-decoration:none;">GROUND VIEWS</a>
+            <a href="/world.html" class="nav-btn" style="text-decoration:none;">WORLD MONITOR</a>
             <button class="nav-btn" onclick="feeds.openEditor()">Configure</button>
             <button class="nav-btn" onclick="app.toggleFullscreen()">Fullscreen</button>
-            <span class="nav-hint">1-9 audio · S solo · ESC mute</span>
             <button class="nav-btn"
                 onclick="localStorage.removeItem('warroom_auth'); window.location.href='/login.html'"
-                style="background:rgba(255,32,32,0.12);border-color:rgba(255,32,32,0.3);color:#ff4040;">⏻
-                Logout</button>
+                style="background:rgba(255,32,32,0.12);border-color:rgba(255,32,32,0.3);color:#ff4040;">Logout</button>
         </div>
     </header>
 
@@ -171,12 +173,6 @@
         <section class="dashboard__main" id="dashboardMain">
             <div class="live-tabs" id="liveTabs">
                 <button class="live-tab active" onclick="switchLiveTab('iran-attacks')">IRAN ATTACKS</button>
-                <a href="/groundviews.html" class="live-tab"
-                    style="margin-left:auto;background:rgba(255,32,32,0.08);border:1px solid rgba(255,32,32,0.2);color:#ff4040;text-decoration:none;">⛶
-                    GROUND VIEWS</a>
-                <a href="/world.html" class="live-tab"
-                    style="background:rgba(255,32,32,0.08);border:1px solid rgba(255,32,32,0.2);color:#ff4040;text-decoration:none;">⛶
-                    WORLD MONITOR</a>
             </div>
             <div class="dashboard__feeds" id="videoWall"></div>
         </section>
