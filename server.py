@@ -14,6 +14,19 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response, FileResponse, HTMLResponse
 from pydantic import BaseModel
 import httpx
+import sys
+import threading
+import subprocess
+
+# ── TTS ENGINE (Persistent Memory) ──
+tts_engine = None
+try:
+    sys.path.append("/Volumes/WORK 2TB/WORK 2026/DASHBOARD/intelligence/backend")
+    from kokoro_mlx_tts import KokoroMLXTTS
+    tts_engine = KokoroMLXTTS()
+    print("🎙️ Kokoro TTS Engine Loaded in Memory")
+except Exception as e:
+    print(f"⚠️ Kokoro TTS not loaded. Error: {e}")
 
 # ── DATA FILE ──
 DATA_DIR = Path(__file__).parent / "data"
@@ -45,6 +58,9 @@ class StreamUpdate(BaseModel):
 
 class StreamList(BaseModel):
     streams: list[Stream]
+
+class TTSRequest(BaseModel):
+    text: str
 
 # ── PERSISTENCE ──
 def load_streams() -> dict[str, Stream]:
@@ -359,7 +375,7 @@ async def proxy_stream(url: str = Query(..., description="URL to proxy")):
         resp = await _http_client.get(url, headers={
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
             "Referer": url,
-        })
+        }, timeout=8.0, follow_redirects=True)
         content = resp.content
         content_type = resp.headers.get("content-type", "application/octet-stream")
 
@@ -387,7 +403,12 @@ async def proxy_stream(url: str = Query(..., description="URL to proxy")):
             }
         )
     except Exception as e:
-        raise HTTPException(502, f"Proxy error: {str(e)}")
+        return Response(
+            content=f"Proxy error: {str(e)}",
+            status_code=502,
+            media_type="text/plain",
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
 
 
 # ── LIVE NEWS FEED (Google News RSS) ──
@@ -1088,6 +1109,94 @@ async def director_page():
     if p.exists():
         return FileResponse(str(p))
     return HTMLResponse("<h1>Director page coming soon</h1>")
+
+# ── DIRECTOR → LIVE RELAY (WebSocket — instant) ──
+# Director POSTs commands → server instantly pushes to all connected live.html clients via WebSocket.
+# Zero latency. Works across Chrome (Director) ↔ OBS (live.html).
+
+from fastapi import Body, WebSocket, WebSocketDisconnect
+import asyncio
+
+_ws_clients: list[WebSocket] = []
+_director_state = {
+    "streams": [],
+    "layout": "9",
+    "soloIndex": 0,
+    "ts": 0
+}
+
+async def _broadcast_ws(message: dict):
+    """Push message instantly to all connected WebSocket clients."""
+    dead = []
+    for ws in _ws_clients:
+        try:
+            await ws.send_json(message)
+        except Exception:
+            dead.append(ws)
+    for ws in dead:
+        _ws_clients.remove(ws)
+
+@app.websocket("/ws/director")
+async def ws_director(websocket: WebSocket):
+    await websocket.accept()
+    _ws_clients.append(websocket)
+    # Send current state on connect
+    try:
+        await websocket.send_json({"action": "stageUpdate", "data": _director_state})
+        while True:
+            await websocket.receive_text()  # Keep alive
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if websocket in _ws_clients:
+            _ws_clients.remove(websocket)
+
+@app.post("/api/update_metadata")
+async def update_metadata(update: StreamUpdate, url: str = Query(...)):
+    pass # Already covered in PUT /api/stream
+
+# ── KOKORO TTS ENDPOINTS ──
+@app.post("/api/tts/announce")
+async def tts_announce(req: TTSRequest):
+    if not tts_engine:
+        return {"status": "error", "message": "TTS Engine not loaded. Check server logs."}
+    
+    # Run the synthesis and playback in a separate thread to prevent blocking FastAPI
+    def _speak_news():
+        try:
+            # Using am_adam for a serious anchor voice, or af_sarah
+            tts_engine.speak(req.text, voice='am_adam', speed=1.0, play=True)
+        except Exception as e:
+            print(f"TTS Synthesis Error: {e}")
+            
+    t = threading.Thread(target=_speak_news)
+    t.start()
+    return {"status": "success", "text": req.text}
+
+@app.post("/api/tts/stop")
+async def tts_stop():
+    try:
+        subprocess.run(['pkill', '-9', 'afplay'], check=False)
+        return {"status": "stopped"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/director-state")
+async def set_director_state(payload: dict = Body(...)):
+    global _director_state
+    _director_state = {**payload, "ts": time.time()}
+    await _broadcast_ws({"action": "stageUpdate", "data": _director_state})
+    return {"ok": True}
+
+@app.get("/api/director-state")
+async def get_director_state():
+    return _director_state
+
+@app.post("/api/director-cmd")
+async def push_director_cmd(payload: dict = Body(...)):
+    await _broadcast_ws(payload)
+    return {"ok": True}
+
 
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 

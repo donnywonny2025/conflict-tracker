@@ -201,6 +201,23 @@ body::after {
     border-color: var(--accent-red);
 }
 
+/* ── RESPONSIVE HEADER ── */
+@media (max-width: 1200px) {
+    .header { gap: 6px; padding: 4px 6px; }
+    .header__ticker { display: none; }
+    .brand-title { display: none; }
+    .clock { display: none; }
+    .nav-btn { padding: 4px 6px; font-size: 8px; letter-spacing: 0; }
+}
+
+@media (max-width: 950px) {
+    .mode-label { font-size: 10px; letter-spacing: 1px; }
+    .live-indicator { padding: 2px 4px; font-size: 7px; gap: 4px; }
+    .header__brand { gap: 4px; }
+    .header__controls { gap: 3px; }
+    .nav-btn { font-size: 7px; padding: 3px 4px; }
+}
+
 .nav-hint {
     font-size: 7px;
     letter-spacing: 0.06em;

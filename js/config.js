@@ -80,7 +80,7 @@ const CONFIG = {
             { type: 'youtube', id: 'KctE56sB5oo', label: 'NDTV 24x7', region: 'INDIA' },
             { type: 'youtube', id: 'XWq5kBlakcQ', label: 'CNA', region: 'SINGAPORE' },
             { type: 'youtube', id: 'NQjabLGdP5g', label: 'Africanews', region: 'PAN-AFRICA' },
-            { type: 'youtube', id: 'rr2e9YNQO4Q', label: 'Sky News Australia', region: 'AUSTRALIA' },
+            { type: 'youtube', id: '87r-1JKz7E4', label: 'Sky News Australia', region: 'AUSTRALIA' },
             { type: 'hls', id: 'presstv', url: 'https://live.presstv.ir/hls/presstv.m3u8', label: 'Press TV (Iran)', region: 'IRAN' },
             { type: 'youtube', id: 'ScdUZNkwcYc', label: 'Espreso TV', region: 'UKRAINE' },
         ],
