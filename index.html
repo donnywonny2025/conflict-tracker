@@ -47,16 +47,7 @@
             }
         }
     </style>
-    <script>
-        // Auth guard — redirect to login if not authenticated
-        try {
-            const auth = JSON.parse(localStorage.getItem('warroom_auth') || '{}');
-            if (!auth.exp || auth.exp < Date.now()) {
-                localStorage.removeItem('warroom_auth');
-                window.location.href = '/login.html';
-            }
-        } catch (e) { window.location.href = '/login.html'; }
-    </script>
+    
 </head>
 
 <body>
