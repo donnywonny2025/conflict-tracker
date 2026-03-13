@@ -47,78 +47,11 @@
             }
         }
     </style>
-    <script>
-        // Auth guard — redirect to login if not authenticated
-        try {
-            const auth = JSON.parse(localStorage.getItem('warroom_auth') || '{}');
-            if (!auth.exp || auth.exp < Date.now()) {
-                localStorage.removeItem('warroom_auth');
-                window.location.href = '/login.html';
-            }
-        } catch (e) { window.location.href = '/login.html'; }
-    </script>
 </head>
 
 <body>
-    <div class="vignette"></div>
-
-    <!-- ── WELCOME OVERLAY (shows on first login) ── -->
-    <div id="welcomeOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(3,3,8,0.95);
-        display:none;flex-direction:column;align-items:center;justify-content:center;
-        font-family:'Inter',sans-serif;cursor:pointer;transition:opacity 0.8s ease;" onclick="dismissWelcome()">
-        <div style="text-align:center;animation:welcomeIn 1s cubic-bezier(0.16,1,0.3,1) forwards;">
-            <div
-                style="font-size:9px;font-weight:800;letter-spacing:4px;color:rgba(40,120,255,0.5);text-transform:uppercase;margin-bottom:12px;">
-                WAR ROOM — INTELLIGENCE COMMAND CENTER
-            </div>
-            <div style="font-size:36px;font-weight:900;letter-spacing:6px;color:#fff;text-transform:uppercase;"
-                id="welcomeName">
-                WELCOME
-            </div>
-            <div
-                style="width:120px;height:2px;background:linear-gradient(90deg,transparent,rgba(40,120,255,0.6),transparent);margin:20px auto;">
-            </div>
-            <div
-                style="font-size:10px;font-weight:600;letter-spacing:3px;color:rgba(255,255,255,0.25);text-transform:uppercase;">
-                CLICK TO ENTER · ALL SYSTEMS ONLINE
-            </div>
-        </div>
-    </div>
-    <style>
-        @keyframes welcomeIn {
-            from {
-                opacity: 0;
-                transform: scale(0.95) translateY(20px);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
-        }
-    </style>
-    <script>
-        (function () {
-            try {
-                const auth = JSON.parse(localStorage.getItem('warroom_auth') || '{}');
-                if (auth.justLoggedIn) {
-                    const overlay = document.getElementById('welcomeOverlay');
-                    const nameEl = document.getElementById('welcomeName');
-                    nameEl.textContent = 'WELCOME, ' + (auth.name || 'OPERATOR').toUpperCase();
-                    overlay.style.display = 'flex';
-                    // Auto-dismiss after 4 seconds
-                    setTimeout(() => { if (overlay.style.display === 'flex') dismissWelcome(); }, 4000);
-                    // Clear the flag so it doesn't show again on page nav
-                    auth.justLoggedIn = false;
-                    localStorage.setItem('warroom_auth', JSON.stringify(auth));
-                }
-            } catch (e) { }
-        })();
-        function dismissWelcome() {
-            const o = document.getElementById('welcomeOverlay');
-            if (o) { o.style.opacity = '0'; setTimeout(() => o.style.display = 'none', 800); }
-        }
-    </script> <!-- ── HEADER ── -->
+    <div class="vignette"></div>    <!-- welcomeOverlay removed -->
+    <!-- ── HEADER ── -->
     <header class="header">
         <div class="header__brand">
             <div class="live-indicator">
@@ -160,10 +93,6 @@
             <a href="/groundviews.html" class="nav-btn" style="text-decoration:none;">GROUND VIEWS</a>
             <a href="/world.html" class="nav-btn" style="text-decoration:none;">WORLD MONITOR</a>
             <button class="nav-btn" onclick="feeds.openEditor()">Configure</button>
-            <button class="nav-btn" onclick="app.toggleFullscreen()">Fullscreen</button>
-            <button class="nav-btn"
-                onclick="localStorage.removeItem('warroom_auth'); window.location.href='/login.html'"
-                style="background:rgba(255,32,32,0.12);border-color:rgba(255,32,32,0.3);color:#ff4040;">Logout</button>
         </div>
     </header>
 
@@ -172,7 +101,9 @@
         <!-- LEFT: Video Wall -->
         <section class="dashboard__main" id="dashboardMain">
             <div class="live-tabs" id="liveTabs">
-                <button class="live-tab active" onclick="switchLiveTab('iran-attacks')">IRAN ATTACKS</button>
+                <button class="live-tab" onclick="feeds.switchLiveTab('iran')">PRIMARY</button>
+                <button class="live-tab active" onclick="feeds.switchLiveTab('iran-attacks')">IRAN ATTACKS</button>
+                <button class="live-tab" onclick="feeds.switchLiveTab('world')">WORLD</button>
             </div>
             <div class="dashboard__feeds" id="videoWall"></div>
         </section>
@@ -478,34 +409,87 @@
             _xLoadingMore = false;
         }
 
+        // Track all seen tweet IDs so we never show duplicates
+        let _seenIds = new Set();
+
         async function switchXFeed(query) {
             _showingSaved = false;
+            const isInitialLoad = _lastTweets.length === 0;
             _currentQuery = query || 'iran war video';
-            _xOffset = 0;
-            _xAllLoaded = false;
-            _xLoadingMore = false;
-            const list = document.getElementById('xTweetList');
-            if (list) list.innerHTML = '<div style="text-align:center;padding:30px;color:#666;font-size:11px;">Loading X feed...</div>';
+            if (isInitialLoad) {
+                _xOffset = 0;
+                _xAllLoaded = false;
+                _xLoadingMore = false;
+                const list = document.getElementById('xTweetList');
+                if (list) list.innerHTML = '<div style="text-align:center;padding:30px;color:#666;font-size:11px;">Loading X feed...</div>';
+            }
             try {
-                const resp = await fetch('/api/xfeed?q=' + encodeURIComponent(_currentQuery) + '&count=15&offset=0');
+                const resp = await fetch('/api/xfeed?q=' + encodeURIComponent(_currentQuery) + '&count=20&offset=0');
                 const data = await resp.json();
                 if (data.tweets && data.tweets.length > 0) {
-                    // Video-only, newest first
-                    const videoOnly = data.tweets.filter(t => t.has_video || t.video_url);
-                    videoOnly.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
-                    // Cap per author to max 3 so feed is diverse
+                    // Strict video-only filter
+                    const videoOnly = data.tweets.filter(t => t.has_video && t.video_url);
+                    // CRITICAL: Sort by ID (Snowflake) instead of unreliable date strings
+                    videoOnly.sort((a, b) => (b.id || '').localeCompare(a.id || '', undefined, {numeric: true}));
+                    // Cap per author
                     const authorCounts = {};
                     const diverse = videoOnly.filter(t => {
                         const a = t.author || '?';
                         authorCounts[a] = (authorCounts[a] || 0) + 1;
                         return authorCounts[a] <= 3;
                     });
-                    renderTweetCards(diverse, false);
-                } else {
+
+                    if (isInitialLoad) {
+                        // First load: render everything
+                        diverse.forEach(t => _seenIds.add(t.id));
+                        renderTweetCards(diverse, false);
+                    } else {
+                        // Subsequent refresh: only prepend NEW tweets we haven't seen
+                        const newTweets = diverse.filter(t => !_seenIds.has(t.id));
+                        if (newTweets.length > 0) {
+                            newTweets.forEach(t => _seenIds.add(t.id));
+                            // Prepend to the top of the list
+                            const list = document.getElementById('xTweetList');
+                            if (list) {
+                                _lastTweets = newTweets.concat(_lastTweets);
+                                const html = newTweets.map(t => {
+                                    const ago = timeAgo(t.created || t.saved_at);
+                                    const saved = isSaved(t.id);
+                                    const heartBtn = '<span onclick="toggleSave(\'' + t.id + '\', event)" style="cursor:pointer;font-size:14px;margin-left:6px;transition:all 0.2s;" title="' + (saved ? 'Unsave' : 'Save') + '">' + (saved ? '❤️' : '🤍') + '</span>';
+                                    const videoHtml = t.video_url
+                                        ? '<video src="/api/xvideo?url=' + encodeURIComponent(t.video_url) + '" autoplay loop muted playsinline preload="auto" style="width:100%;max-height:200px;border-radius:4px;margin-top:4px;background:#000;"></video>'
+                                        : (t.thumbnail ? '<img src="' + t.thumbnail + '" style="width:100%;max-height:160px;object-fit:cover;border-radius:4px;margin-top:4px;" loading="lazy">' : '');
+                                    return '<div style="padding:8px;margin-bottom:4px;background:rgba(29,155,240,0.08);border:1px solid rgba(29,155,240,0.2);border-radius:6px;cursor:pointer;animation:fadeIn 0.5s ease;" onclick="window.open(\'https://x.com/i/status/' + t.id + '\',\'_blank\')">'
+                                        + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+                                        + '<span style="font-size:8px;color:#1d9bf0;font-weight:700;">🆕 NEW</span>'
+                                        + '<span style="font-size:11px;color:#1d9bf0;font-weight:600;">@' + (t.author || '?') + '</span>'
+                                        + (t.has_video ? '<span style="font-size:8px;color:#e84855;font-weight:700;">&#9654; VID</span>' : '')
+                                        + '<span style="font-size:9px;color:#888;margin-left:auto;">' + ago + '</span>'
+                                        + heartBtn
+                                        + '</div>'
+                                        + '<div style="font-size:12px;color:#ddd;line-height:1.4;">' + (t.text || '') + '</div>'
+                                        + videoHtml
+                                        + '<div style="display:flex;gap:10px;margin-top:4px;font-size:9px;color:#666;">'
+                                        + '<span>&#9829; ' + (t.likes || 0) + '</span>'
+                                        + '<span>&#8635; ' + (t.retweets || 0) + '</span>'
+                                        + '</div></div>';
+                                }).join('');
+                                list.insertAdjacentHTML('afterbegin', html);
+                                // Update counter
+                                const counter = document.getElementById('xVideoCount');
+                                if (counter) counter.textContent = _lastTweets.length + ' posts';
+                            }
+                        }
+                    }
+                } else if (isInitialLoad) {
+                    const list = document.getElementById('xTweetList');
                     if (list) list.innerHTML = '<div style="text-align:center;padding:30px;color:#666;font-size:11px;">No posts found</div>';
                 }
             } catch (e) {
-                if (list) list.innerHTML = '<div style="text-align:center;padding:30px;color:#666;font-size:11px;">Feed error</div>';
+                if (_lastTweets.length === 0) {
+                    const list = document.getElementById('xTweetList');
+                    if (list) list.innerHTML = '<div style="text-align:center;padding:30px;color:#666;font-size:11px;">Feed error</div>';
+                }
                 setTimeout(() => switchXFeed(_currentQuery), 5000);
             }
             clearInterval(_xRefreshTimer);
@@ -520,6 +504,7 @@
                 if (_xRefreshCountdown <= 0) switchXFeed(_currentQuery);
             }, 1000);
         }
+
 
         document.addEventListener('DOMContentLoaded', () => setTimeout(() => switchXFeed('iran war video'), 1500));
 
@@ -553,6 +538,7 @@
         fetchWeather();
         setInterval(fetchWeather, 600000); // every 10 min
     </script>
+
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="js/api.js"></script>
     <script>
@@ -577,7 +563,6 @@
                 if (typeof YT !== 'undefined' && YT.Player) {
                     feeds.buildWall();
                 } else {
-                    // YT API still not ready, wait more
                     const check = setInterval(() => {
                         if (typeof YT !== 'undefined' && YT.Player) {
                             clearInterval(check);
@@ -590,5 +575,4 @@
         }, 3000);
     </script>
 </body>
-
 </html>
