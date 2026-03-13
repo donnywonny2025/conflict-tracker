@@ -14,6 +14,19 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response, FileResponse, HTMLResponse
 from pydantic import BaseModel
 import httpx
+import sys
+import threading
+import subprocess
+
+# ── TTS ENGINE (Persistent Memory) ──
+tts_engine = None
+try:
+    sys.path.append("/Volumes/WORK 2TB/WORK 2026/DASHBOARD/intelligence/backend")
+    from kokoro_mlx_tts import KokoroMLXTTS
+    tts_engine = KokoroMLXTTS()
+    print("🎙️ Kokoro TTS Engine Loaded in Memory")
+except Exception as e:
+    print(f"⚠️ Kokoro TTS not loaded. Error: {e}")
 
 # ── DATA FILE ──
 DATA_DIR = Path(__file__).parent / "data"
@@ -45,6 +58,9 @@ class StreamUpdate(BaseModel):
 
 class StreamList(BaseModel):
     streams: list[Stream]
+
+class TTSRequest(BaseModel):
+    text: str
 
 # ── PERSISTENCE ──
 def load_streams() -> dict[str, Stream]:
@@ -359,7 +375,7 @@ async def proxy_stream(url: str = Query(..., description="URL to proxy")):
         resp = await _http_client.get(url, headers={
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
             "Referer": url,
-        })
+        }, timeout=8.0, follow_redirects=True)
         content = resp.content
         content_type = resp.headers.get("content-type", "application/octet-stream")
 
@@ -387,7 +403,12 @@ async def proxy_stream(url: str = Query(..., description="URL to proxy")):
             }
         )
     except Exception as e:
-        raise HTTPException(502, f"Proxy error: {str(e)}")
+        return Response(
+            content=f"Proxy error: {str(e)}",
+            status_code=502,
+            media_type="text/plain",
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
 
 
 # ── LIVE NEWS FEED (Google News RSS) ──
@@ -574,33 +595,46 @@ async def get_videos(count: int = Query(15)):
 
 
 _XFEED_ACCOUNTS = [
-    'sentdefender', 'Osinttechnical', 'DropSiteNews', 'AJEnglish', 'AJENews',
-    'michaelh992', 'AuroraIntel', 'Intel_Sky', 'GeoConfirmed', 'criticalthreats',
-    'Shayan86', 'Posht_Parde', 'IranIntl_En', 'IsraelRadar_',
-    'clabordeAJ', 'JoeTruzman', 'no_itsmyturn', 'BBCWorld', 'Reuters', 'AP',
-]
-# ═══════════════════════════════════════════════════════════════
-#  X FEED — Built-in Live Fetcher (no external scraper needed)
-#  Pulls fresh timelines every 60s from Nitter + FxTwitter
-# ═══════════════════════════════════════════════════════════════
-
-_XFEED_ACCOUNTS = [
-    'sentdefender', 'Osinttechnical', 'Intel_Sky', 'AJEnglish',
+    'sentdefender', 'Osinttechnical', 'Intel_Sky', 'AJEnglish', 'AJENews',
     'michaelh992', 'AuroraIntel', 'DropSiteNews', 'IranIntl_En',
     'BNONews', 'IsraelRadar_', 'GeoConfirmed', 'Faytuks',
     'JoeTruzman', 'Shayan86', 'BBCBreaking', 'clabordeAJ',
+    'Archer83Able', 'Caucasuswar', 'ragipsoylu', 'ELINTNews',
+    'Natsecjeff', 'OAlexanderDK', 'john_marquee', 'Global_Mil_Info',
+    'front_ukrainian', 'Tendar', 'NOELreports', 'Maks_NAFO_FELLA',
+    'clashreport', 'nexta_tv', 'TheStudyofWar', 'IntelDoge',
+    'WarMonitor3', 'Osintn', 'EuromaidanPress', 'visegrad24',
+    'Gerashchenko_en', 'IuliiaMendel', 'KyivIndependent', 'KyivPost'
 ]
 _NITTER_MIRRORS = [
     'https://nitter.privacydev.net',
     'https://nitter.poast.org',
     'https://nitter.1d4.us',
     'https://xcancel.com',
+    'https://nitter.lucabased.xyz',
+    'https://nitter.catsarch.com',
+    'https://nitter.perennialte.ch',
+    'https://nitter.salastil.com',
+    'https://nitter.qwik.space',
+    'https://nitter.unixfox.eu',
+    'https://nitter.kavin.rocks',
+    'https://nitter.soopy.moe',
+    'https://nitter.d420.de',
+    'https://nitter.eu',
+    'https://nitter.cz'
 ]
 _SOURCE_GROUPS = {
     'AJEnglish': 'aljazeera', 'AJENews': 'aljazeera', 'AJELive': 'aljazeera',
     'BBCBreaking': 'bbc', 'BBCWorld': 'bbc',
 }
 _xfeed_live_cache = {"tweets": [], "ts": 0, "sources": []}
+_XFEED_CACHE_FILE = Path(__file__).parent / "data" / "xfeed_cache.json"
+if _XFEED_CACHE_FILE.exists():
+    try:
+        import json as _json
+        _xfeed_live_cache = _json.loads(_XFEED_CACHE_FILE.read_text())
+    except Exception:
+        pass
 
 
 def _get_source_group(author):
@@ -751,13 +785,14 @@ async def _refresh_xfeed():
                 except Exception:
                     pass
 
-            # Source 2: Nitter keyword search — 3 random queries in parallel
+            # Source 2: Nitter keyword search — 10 random queries in parallel
             searches = _build_searches()
-            search_queries = random.sample(searches, min(3, len(searches)))
+            search_queries = random.sample(searches, min(10, len(searches)))
             search_tasks = [_search_nitter(q) for q in search_queries]
 
-            # Source 3: Nitter account timelines — 6 random accounts in parallel
-            accounts = random.sample(_XFEED_ACCOUNTS, min(6, len(_XFEED_ACCOUNTS)))
+            # Source 3: Nitter account timelines — 25 random accounts in parallel
+            # Use a larger pool and higher sampling for maximum freshness
+            accounts = random.sample(_XFEED_ACCOUNTS, min(25, len(_XFEED_ACCOUNTS)))
             account_tasks = [_fetch_account_nitter(a) for a in accounts]
 
             # Run all in parallel for speed
@@ -773,24 +808,35 @@ async def _refresh_xfeed():
                 if t["id"] not in seen_ids:
                     seen_ids.add(t["id"])
                     deduped.append(t)
-            random.shuffle(deduped)
+            
+            # CRITICAL: Sort by ID descending so newest tweets are ENRICHED first!
+            # Shuffling here was causing "stale" videos to fill the cache.
+            deduped.sort(key=lambda t: -int(t.get("id", "0")))
 
-            # Enrich top 30 via FxTwitter for media (video URL, thumbnail)
+            # Enrich top 80 (increased from 60) via FxTwitter for media
             enriched = await asyncio.gather(
-                *[_enrich_tweet(t["id"], t["author"]) for t in deduped[:30]]
+                *[_enrich_tweet(t["id"], t["author"]) for t in deduped[:80]]
             )
             new_tweets = [t for t in enriched if t]
 
             if new_tweets:
                 existing_ids = {t["id"] for t in new_tweets}
+                # Keep cache sorted by ID
                 merged = new_tweets + [t for t in _xfeed_live_cache["tweets"]
                                        if t["id"] not in existing_ids]
                 merged.sort(key=lambda t: -int(t.get("id", "0")))
-                _xfeed_live_cache["tweets"] = merged[:60]
+                _xfeed_live_cache["tweets"] = merged[:400] # Expanded cache to 400
                 _xfeed_live_cache["ts"] = time.time()
-                _xfeed_live_cache["sources"] = list(set(t["author"] for t in merged[:60]))
+                _xfeed_live_cache["sources"] = list(set(t["author"] for t in merged[:400]))
                 vid_count = sum(1 for t in new_tweets if t.get("has_video"))
                 print(f"[X FEED] {len(new_tweets)} tweets ({vid_count} vid) from {len(_xfeed_live_cache['sources'])} sources")
+                
+                # Persist to disk
+                try:
+                    import json as _json
+                    _XFEED_CACHE_FILE.write_text(_json.dumps(_xfeed_live_cache))
+                except Exception as e:
+                    print(f"[X FEED] Save cache error: {e}")
         except Exception as e:
             print(f"[X FEED] Error: {e}")
         await asyncio.sleep(60)
@@ -813,7 +859,7 @@ async def get_xfeed(q: str = Query("iran war video"), count: int = Query(15), of
 
     # Source 1: Live cache (Nitter + FxTwitter background fetcher)
     for t in _xfeed_live_cache.get("tweets", []):
-        if t["id"] not in seen_ids:
+        if t["id"] not in seen_ids and t.get("has_video") and t.get("video_url"):
             seen_ids.add(t["id"])
             all_tweets.append(t)
 
@@ -868,34 +914,18 @@ async def get_xfeed(q: str = Query("iran war video"), count: int = Query(15), of
             "pool_size": len(all_tweets),
         }
 
-    # ── DIVERSITY: shuffle within recency tiers, max 2 per source ──
+    # ── STRICT CHRONOLOGICAL: No shuffling, just absolute newest ──
     group_counts = defaultdict(int)
     diverse = []
 
-    # Tier 1: newest 30 tweets — shuffle for variety each refresh
-    top = all_tweets[:30]
-    random.shuffle(top)
-    for tw in top:
+    for tw in all_tweets:
+        # Prevent absolute spam from a single source (max 4 per fetch)
         grp = _get_source_group(tw.get("author", ""))
-        if group_counts[grp] < 2:
+        if group_counts[grp] < 4:
             diverse.append(tw)
             group_counts[grp] += 1
         if len(diverse) >= count:
             break
-
-    # Tier 2: fill from rest if needed
-    if len(diverse) < count:
-        rest = all_tweets[30:]
-        random.shuffle(rest)
-        for tw in rest:
-            if tw["id"] in {d["id"] for d in diverse}:
-                continue
-            grp = _get_source_group(tw.get("author", ""))
-            if group_counts[grp] < 3:
-                diverse.append(tw)
-                group_counts[grp] += 1
-            if len(diverse) >= count:
-                break
 
     # Enrich any tweets missing video_url (from scraper file)
     import asyncio
@@ -1088,6 +1118,94 @@ async def director_page():
     if p.exists():
         return FileResponse(str(p))
     return HTMLResponse("<h1>Director page coming soon</h1>")
+
+# ── DIRECTOR → LIVE RELAY (WebSocket — instant) ──
+# Director POSTs commands → server instantly pushes to all connected live.html clients via WebSocket.
+# Zero latency. Works across Chrome (Director) ↔ OBS (live.html).
+
+from fastapi import Body, WebSocket, WebSocketDisconnect
+import asyncio
+
+_ws_clients: list[WebSocket] = []
+_director_state = {
+    "streams": [],
+    "layout": "9",
+    "soloIndex": 0,
+    "ts": 0
+}
+
+async def _broadcast_ws(message: dict):
+    """Push message instantly to all connected WebSocket clients."""
+    dead = []
+    for ws in _ws_clients:
+        try:
+            await ws.send_json(message)
+        except Exception:
+            dead.append(ws)
+    for ws in dead:
+        _ws_clients.remove(ws)
+
+@app.websocket("/ws/director")
+async def ws_director(websocket: WebSocket):
+    await websocket.accept()
+    _ws_clients.append(websocket)
+    # Send current state on connect
+    try:
+        await websocket.send_json({"action": "stageUpdate", "data": _director_state})
+        while True:
+            await websocket.receive_text()  # Keep alive
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if websocket in _ws_clients:
+            _ws_clients.remove(websocket)
+
+@app.post("/api/update_metadata")
+async def update_metadata(update: StreamUpdate, url: str = Query(...)):
+    pass # Already covered in PUT /api/stream
+
+# ── KOKORO TTS ENDPOINTS ──
+@app.post("/api/tts/announce")
+async def tts_announce(req: TTSRequest):
+    if not tts_engine:
+        return {"status": "error", "message": "TTS Engine not loaded. Check server logs."}
+    
+    # Run the synthesis and playback in a separate thread to prevent blocking FastAPI
+    def _speak_news():
+        try:
+            # Using am_adam for a serious anchor voice, or af_sarah
+            tts_engine.speak(req.text, voice='am_adam', speed=1.0, play=True)
+        except Exception as e:
+            print(f"TTS Synthesis Error: {e}")
+            
+    t = threading.Thread(target=_speak_news)
+    t.start()
+    return {"status": "success", "text": req.text}
+
+@app.post("/api/tts/stop")
+async def tts_stop():
+    try:
+        subprocess.run(['pkill', '-9', 'afplay'], check=False)
+        return {"status": "stopped"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/director-state")
+async def set_director_state(payload: dict = Body(...)):
+    global _director_state
+    _director_state = {**payload, "ts": time.time()}
+    await _broadcast_ws({"action": "stageUpdate", "data": _director_state})
+    return {"ok": True}
+
+@app.get("/api/director-state")
+async def get_director_state():
+    return _director_state
+
+@app.post("/api/director-cmd")
+async def push_director_cmd(payload: dict = Body(...)):
+    await _broadcast_ws(payload)
+    return {"ok": True}
+
 
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 

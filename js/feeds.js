@@ -126,7 +126,7 @@ const feeds = (() => {
                     <span class="audio-badge" id="badge-${i}" style="top:auto;bottom:20px;right:4px;">
                         <span class="material-symbols-outlined">volume_off</span>MUTED
                     </span>
-                    <a class="ext-link" href="https://www.youtube.com/watch?v=${ytId}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open in YouTube">↗</a>
+                    <a class="ext-link" id="link-${i}" href="https://www.youtube.com/watch?v=${ytId}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open in YouTube">↗</a>
                     <div class="cell-controls">
                         <button class="cell-btn cell-btn--fav ${favorites[stream.id] ? 'is-fav' : ''}" id="fav-${i}" onclick="event.stopPropagation(); feeds.toggleFavorite(${i})" title="Favorite">${favorites[stream.id] ? '❤️' : '🤍'}</button>
                         <button class="cell-btn cell-btn--solo" onclick="event.stopPropagation(); feeds.soloCell(${i})">◉ Solo</button>
@@ -134,16 +134,39 @@ const feeds = (() => {
                     </div>
                 `;
                 wall.appendChild(cell);
-                // Use YouTube IFrame API for proper mute/unmute without reload
-                players[i] = new YT.Player(`player-${i}`, {
-                    videoId: ytId,
-                    playerVars: { autoplay: 1, mute: 1, controls: 0, modestbranding: 1, rel: 0, iv_load_policy: 3, playsinline: 1 },
-                    events: {
-                        onReady: () => { playersReady[i] = true; },
-                        onError: () => { playersReady[i] = false; }
-                    }
-                });
                 playersReady[i] = false;
+
+                // Async fetch live ID
+                (async () => {
+                    let finalYtId = ytId;
+                    if (stream.handle) {
+                        try {
+                            const params = new URLSearchParams({ channel: stream.handle });
+                            const res = await fetch(`/api/youtube/live?${params.toString()}`);
+                            if (res.ok) {
+                                const data = await res.json();
+                                if (data.videoId) {
+                                    finalYtId = data.videoId;
+                                    // Update external link
+                                    const linkEl = document.getElementById(`link-${i}`);
+                                    if (linkEl) linkEl.href = `https://www.youtube.com/watch?v=${finalYtId}`;
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`[Live Resolve] Failed for ${stream.handle}`, e);
+                        }
+                    }
+                    
+                    // Use YouTube IFrame API for proper mute/unmute without reload
+                    players[i] = new YT.Player(`player-${i}`, {
+                        videoId: finalYtId,
+                        playerVars: { autoplay: 1, mute: 1, controls: 0, modestbranding: 1, rel: 0, iv_load_policy: 3, playsinline: 1 },
+                        events: {
+                            onReady: () => { playersReady[i] = true; },
+                            onError: () => { playersReady[i] = false; }
+                        }
+                    });
+                })();
             } else if (stream.id && ['twitch', 'kick', 'rumble'].includes(stream.type)) {
                 let url = '';
                 if (stream.type === 'twitch') {
