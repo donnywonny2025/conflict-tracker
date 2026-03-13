@@ -41,6 +41,12 @@ else
     exit 1
 fi
 
+# Start X scraper
+echo -e "${CYAN}[4/4]${NC} Starting X scraper daemon..."
+nohup node x-scraper.js daemon > /tmp/warroom-scraper.log 2>&1 &
+SCRAPER_PID=$!
+echo -e "  ${GREEN}✓${NC} Scraper running (PID $SCRAPER_PID)"
+
 echo ""
 echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo -e "${GREEN}  War Room is LIVE${NC}"

@@ -5,3 +5,5 @@ x-tweets.json
 __pycache__/
 *.pyc
 .DS_Store
+data/streams.json
+data/**/[0-9]*_*.json

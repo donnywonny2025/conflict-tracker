@@ -595,33 +595,46 @@ async def get_videos(count: int = Query(15)):
 
 
 _XFEED_ACCOUNTS = [
-    'sentdefender', 'Osinttechnical', 'DropSiteNews', 'AJEnglish', 'AJENews',
-    'michaelh992', 'AuroraIntel', 'Intel_Sky', 'GeoConfirmed', 'criticalthreats',
-    'Shayan86', 'Posht_Parde', 'IranIntl_En', 'IsraelRadar_',
-    'clabordeAJ', 'JoeTruzman', 'no_itsmyturn', 'BBCWorld', 'Reuters', 'AP',
-]
-# ═══════════════════════════════════════════════════════════════
-#  X FEED — Built-in Live Fetcher (no external scraper needed)
-#  Pulls fresh timelines every 60s from Nitter + FxTwitter
-# ═══════════════════════════════════════════════════════════════
-
-_XFEED_ACCOUNTS = [
-    'sentdefender', 'Osinttechnical', 'Intel_Sky', 'AJEnglish',
+    'sentdefender', 'Osinttechnical', 'Intel_Sky', 'AJEnglish', 'AJENews',
     'michaelh992', 'AuroraIntel', 'DropSiteNews', 'IranIntl_En',
     'BNONews', 'IsraelRadar_', 'GeoConfirmed', 'Faytuks',
     'JoeTruzman', 'Shayan86', 'BBCBreaking', 'clabordeAJ',
+    'Archer83Able', 'Caucasuswar', 'ragipsoylu', 'ELINTNews',
+    'Natsecjeff', 'OAlexanderDK', 'john_marquee', 'Global_Mil_Info',
+    'front_ukrainian', 'Tendar', 'NOELreports', 'Maks_NAFO_FELLA',
+    'clashreport', 'nexta_tv', 'TheStudyofWar', 'IntelDoge',
+    'WarMonitor3', 'Osintn', 'EuromaidanPress', 'visegrad24',
+    'Gerashchenko_en', 'IuliiaMendel', 'KyivIndependent', 'KyivPost'
 ]
 _NITTER_MIRRORS = [
     'https://nitter.privacydev.net',
     'https://nitter.poast.org',
     'https://nitter.1d4.us',
     'https://xcancel.com',
+    'https://nitter.lucabased.xyz',
+    'https://nitter.catsarch.com',
+    'https://nitter.perennialte.ch',
+    'https://nitter.salastil.com',
+    'https://nitter.qwik.space',
+    'https://nitter.unixfox.eu',
+    'https://nitter.kavin.rocks',
+    'https://nitter.soopy.moe',
+    'https://nitter.d420.de',
+    'https://nitter.eu',
+    'https://nitter.cz'
 ]
 _SOURCE_GROUPS = {
     'AJEnglish': 'aljazeera', 'AJENews': 'aljazeera', 'AJELive': 'aljazeera',
     'BBCBreaking': 'bbc', 'BBCWorld': 'bbc',
 }
 _xfeed_live_cache = {"tweets": [], "ts": 0, "sources": []}
+_XFEED_CACHE_FILE = Path(__file__).parent / "data" / "xfeed_cache.json"
+if _XFEED_CACHE_FILE.exists():
+    try:
+        import json as _json
+        _xfeed_live_cache = _json.loads(_XFEED_CACHE_FILE.read_text())
+    except Exception:
+        pass
 
 
 def _get_source_group(author):
@@ -772,13 +785,14 @@ async def _refresh_xfeed():
                 except Exception:
                     pass
 
-            # Source 2: Nitter keyword search — 3 random queries in parallel
+            # Source 2: Nitter keyword search — 10 random queries in parallel
             searches = _build_searches()
-            search_queries = random.sample(searches, min(3, len(searches)))
+            search_queries = random.sample(searches, min(10, len(searches)))
             search_tasks = [_search_nitter(q) for q in search_queries]
 
-            # Source 3: Nitter account timelines — 6 random accounts in parallel
-            accounts = random.sample(_XFEED_ACCOUNTS, min(6, len(_XFEED_ACCOUNTS)))
+            # Source 3: Nitter account timelines — 25 random accounts in parallel
+            # Use a larger pool and higher sampling for maximum freshness
+            accounts = random.sample(_XFEED_ACCOUNTS, min(25, len(_XFEED_ACCOUNTS)))
             account_tasks = [_fetch_account_nitter(a) for a in accounts]
 
             # Run all in parallel for speed
@@ -794,24 +808,35 @@ async def _refresh_xfeed():
                 if t["id"] not in seen_ids:
                     seen_ids.add(t["id"])
                     deduped.append(t)
-            random.shuffle(deduped)
+            
+            # CRITICAL: Sort by ID descending so newest tweets are ENRICHED first!
+            # Shuffling here was causing "stale" videos to fill the cache.
+            deduped.sort(key=lambda t: -int(t.get("id", "0")))
 
-            # Enrich top 30 via FxTwitter for media (video URL, thumbnail)
+            # Enrich top 80 (increased from 60) via FxTwitter for media
             enriched = await asyncio.gather(
-                *[_enrich_tweet(t["id"], t["author"]) for t in deduped[:30]]
+                *[_enrich_tweet(t["id"], t["author"]) for t in deduped[:80]]
             )
             new_tweets = [t for t in enriched if t]
 
             if new_tweets:
                 existing_ids = {t["id"] for t in new_tweets}
+                # Keep cache sorted by ID
                 merged = new_tweets + [t for t in _xfeed_live_cache["tweets"]
                                        if t["id"] not in existing_ids]
                 merged.sort(key=lambda t: -int(t.get("id", "0")))
-                _xfeed_live_cache["tweets"] = merged[:60]
+                _xfeed_live_cache["tweets"] = merged[:400] # Expanded cache to 400
                 _xfeed_live_cache["ts"] = time.time()
-                _xfeed_live_cache["sources"] = list(set(t["author"] for t in merged[:60]))
+                _xfeed_live_cache["sources"] = list(set(t["author"] for t in merged[:400]))
                 vid_count = sum(1 for t in new_tweets if t.get("has_video"))
                 print(f"[X FEED] {len(new_tweets)} tweets ({vid_count} vid) from {len(_xfeed_live_cache['sources'])} sources")
+                
+                # Persist to disk
+                try:
+                    import json as _json
+                    _XFEED_CACHE_FILE.write_text(_json.dumps(_xfeed_live_cache))
+                except Exception as e:
+                    print(f"[X FEED] Save cache error: {e}")
         except Exception as e:
             print(f"[X FEED] Error: {e}")
         await asyncio.sleep(60)
@@ -834,7 +859,7 @@ async def get_xfeed(q: str = Query("iran war video"), count: int = Query(15), of
 
     # Source 1: Live cache (Nitter + FxTwitter background fetcher)
     for t in _xfeed_live_cache.get("tweets", []):
-        if t["id"] not in seen_ids:
+        if t["id"] not in seen_ids and t.get("has_video") and t.get("video_url"):
             seen_ids.add(t["id"])
             all_tweets.append(t)
 
@@ -889,34 +914,18 @@ async def get_xfeed(q: str = Query("iran war video"), count: int = Query(15), of
             "pool_size": len(all_tweets),
         }
 
-    # ── DIVERSITY: shuffle within recency tiers, max 2 per source ──
+    # ── STRICT CHRONOLOGICAL: No shuffling, just absolute newest ──
     group_counts = defaultdict(int)
     diverse = []
 
-    # Tier 1: newest 30 tweets — shuffle for variety each refresh
-    top = all_tweets[:30]
-    random.shuffle(top)
-    for tw in top:
+    for tw in all_tweets:
+        # Prevent absolute spam from a single source (max 4 per fetch)
         grp = _get_source_group(tw.get("author", ""))
-        if group_counts[grp] < 2:
+        if group_counts[grp] < 4:
             diverse.append(tw)
             group_counts[grp] += 1
         if len(diverse) >= count:
             break
-
-    # Tier 2: fill from rest if needed
-    if len(diverse) < count:
-        rest = all_tweets[30:]
-        random.shuffle(rest)
-        for tw in rest:
-            if tw["id"] in {d["id"] for d in diverse}:
-                continue
-            grp = _get_source_group(tw.get("author", ""))
-            if group_counts[grp] < 3:
-                diverse.append(tw)
-                group_counts[grp] += 1
-            if len(diverse) >= count:
-                break
 
     # Enrich any tweets missing video_url (from scraper file)
     import asyncio
